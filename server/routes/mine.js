@@ -16,35 +16,36 @@ router.post('/', async (req, res) => {
 
     const countNum = Math.min(Math.max(parseInt(count) || 25, 1), 100)
 
-    console.log(`[mine] Iniciando varredura: query="${query}", count=${countNum}`)
+    console.log(`[mine] Iniciando varredura com Playbook do Pedro: query="${query}", count=${countNum}`)
 
-    // 1. Minerar perfis via Apify (ou mock)
+    // 1. Minerar perfis completos via Apify
     const profiles = await runMiningActor(query.trim(), countNum)
 
-    console.log(`[mine] ${profiles.length} perfis minerados — iniciando enriquecimento...`)
+    console.log(`[mine] ${profiles.length} perfis recebidos — iniciando enriquecimento e auditoria...`)
 
     let imported = 0
     let skipped = 0
 
-    // 2. Enriquecer cada perfil
+    // 2. Enriquecer e auditar cada perfil
     for (const profile of profiles) {
       try {
-        // Inspecionar link da bio
-        const linkData = profile.external_url
-          ? await inspectLink(profile.external_url)
-          : { whatsapp: null, hasCompetitor: false, competitorName: null }
+        // Inspecionar link externo E bio (detecta WhatsApp, Concorrentes, Agência, Rifa, Shopee)
+        const linkData = await inspectLink(profile.external_url, profile.bio)
 
         const enriched = {
           ...profile,
           whatsapp: profile.whatsapp || linkData.whatsapp,
           has_competitor: profile.has_competitor || linkData.hasCompetitor,
           competitor_name: profile.competitor_name || linkData.competitorName,
+          is_agency: profile.is_agency || linkData.isAgency,
+          promotes_raffle: profile.promotes_raffle || linkData.promotesRaffle,
+          promotes_shopee: profile.promotes_shopee || linkData.promotesShopee,
         }
 
-        // Calcular score
+        // Calcular pontuação refinada com filtros anti-lixo
         const { score, classification } = calculateScore(enriched)
 
-        // Upsert no store (Supabase ou in-memory)
+        // Upsert no store (Supabase PostgreSQL ou in-memory)
         await store.upsertInfluencer({ ...enriched, score, classification })
         imported++
       } catch (profileErr) {
@@ -53,7 +54,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    console.log(`[mine] Concluído: ${imported} importados, ${skipped} pulados`)
+    console.log(`[mine] Concluído com sucesso: ${imported} importados, ${skipped} pulados`)
     res.json({ imported, skipped })
   } catch (err) {
     res.status(500).json({ error: err.message })

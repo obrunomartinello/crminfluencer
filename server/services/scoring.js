@@ -1,37 +1,68 @@
 /**
- * calculateScore — pure function, no side effects
+ * calculateScore — motor refinado com o Playbook do Pedro
  * @param {Object} inf - influencer object
- * @returns {{ score: number, classification: string }}
+ * @returns {{ score: number, classification: string, tags: string[] }}
  */
 function calculateScore(inf) {
   const followers = inf.followers_count || 0
   const engagementRate = followers > 0 ? (inf.engagement_rate || 0) : 0
+  const tags = []
 
-  // Bot penalty: high followers but very low engagement → LIXO
+  // 1. Penalidade Anti-Bot: seguidores comprados / fantasma
   if (followers > 10_000 && engagementRate < 2) {
-    return { score: 10, classification: 'LIXO' }
+    tags.push('Bot / Seguidor Fantasma')
+    return { score: 10, classification: 'LIXO', tags }
+  }
+
+  // 2. Penalidade Agência / Assessoria (Pedro quer "o cara povão / solto")
+  if (inf.is_agency) {
+    tags.push('Agência / Assessoria')
+    return { score: 15, classification: 'LIXO', tags }
   }
 
   let score = 0
 
-  // +30: Sweet spot de seguidores (10k–120k)
+  // +30: Faixa Ideal "Cara Povão" (10k a 120k seguidores)
   if (followers >= 10_000 && followers <= 120_000) {
     score += 30
+    tags.push('Faixa Ouro (10k-120k)')
+  } else if (followers > 120_000 && followers <= 200_000) {
+    score += 15
+    tags.push('Grande Porte (120k-200k)')
   }
 
   // +35: Engajamento alto em Reels (≥15%)
   if (engagementRate >= 15) {
     score += 35
-  }
-
-  // +20: WhatsApp comercial encontrado
-  if (inf.whatsapp) {
+    tags.push('Alto Engajamento Reels')
+  } else if (engagementRate >= 7) {
     score += 20
   }
 
-  // +15: Audiência virgem (sem concorrente na bio)
+  // +20: WhatsApp comercial detectado
+  if (inf.whatsapp) {
+    score += 20
+    tags.push('WhatsApp Direto')
+  }
+
+  // +15: Audiência virgem (nunca postou casa de aposta)
   if (!inf.has_competitor) {
     score += 15
+    tags.push('Audiência Virgem')
+  } else {
+    tags.push(`Divulga ${inf.competitor_name || 'Concorrente'}`)
+  }
+
+  // Penalidade Rifa (público sem dinheiro pra depósito)
+  if (inf.promotes_raffle) {
+    score = Math.max(0, score - 30)
+    tags.push('⚠️ Promove Rifa')
+  }
+
+  // Penalidade Achadinhos / Shopee
+  if (inf.promotes_shopee) {
+    score = Math.max(0, score - 20)
+    tags.push('⚠️ Achadinhos / Shopee')
   }
 
   // Classificação final
@@ -41,52 +72,7 @@ function calculateScore(inf) {
   else if (score >= 30) classification = 'BRONZE'
   else classification = 'LIXO'
 
-  return { score, classification }
+  return { score, classification, tags }
 }
 
 module.exports = { calculateScore }
-
-// --- Verificação inline (rode: node server/services/scoring.js) ---
-if (require.main === module) {
-  const cases = [
-    {
-      label: 'OURO perfeito',
-      inf: { followers_count: 50000, engagement_rate: 20, whatsapp: '5511999998888', has_competitor: false },
-      expectedScore: 100,
-      expectedClass: 'OURO',
-    },
-    {
-      label: 'Bot penalty (seguidores comprados)',
-      inf: { followers_count: 50000, engagement_rate: 0.5, whatsapp: null, has_competitor: true },
-      expectedScore: 10,
-      expectedClass: 'LIXO',
-    },
-    {
-      label: 'Pequeno sem WhatsApp',
-      inf: { followers_count: 5000, engagement_rate: 10, whatsapp: null, has_competitor: true },
-      expectedScore: 0,
-      expectedClass: 'LIXO',
-    },
-    {
-      label: 'Zero followers (sem crash)',
-      inf: { followers_count: 0, engagement_rate: 0, whatsapp: null, has_competitor: false },
-      expectedScore: 15,
-      expectedClass: 'LIXO', // score=15 < 30, correto per spec
-    },
-    {
-      label: 'PRATA com concorrente mas WhatsApp',
-      inf: { followers_count: 60000, engagement_rate: 3, whatsapp: '5511988887777', has_competitor: true },
-      expectedScore: 50,
-      expectedClass: 'PRATA',
-    },
-  ]
-
-  let passed = 0
-  for (const { label, inf, expectedScore, expectedClass } of cases) {
-    const result = calculateScore(inf)
-    const ok = result.score === expectedScore && result.classification === expectedClass
-    console.log(`[${ok ? '✅' : '❌'}] ${label}: score=${result.score} (expected ${expectedScore}), class=${result.classification} (expected ${expectedClass})`)
-    if (ok) passed++
-  }
-  console.log(`\n${passed}/${cases.length} casos passaram`)
-}

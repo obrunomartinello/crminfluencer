@@ -5,19 +5,16 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        inter: ['Inter', 'sans-serif'],
+        inter: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       colors: {
         apple: {
-          bg: '#000000',
-          surface: '#1C1C1E',
-          card: '#2C2C2E',
           blue: '#0A84FF',
+          blueHover: '#0071E3',
           green: '#30D158',
           red: '#FF453A',
           yellow: '#FFD60A',
-          text: '#FFFFFF',
-          muted: 'rgba(255,255,255,0.55)',
+          purple: '#BF5AF2',
         },
       },
     },

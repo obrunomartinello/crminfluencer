@@ -5,9 +5,13 @@ import FilterBar from './components/FilterBar'
 import InfluencerTable from './components/InfluencerTable'
 import InfluencerDrawer from './components/InfluencerDrawer'
 import MineModal from './components/MineModal'
-import { Sparkles, Shield, Database, RefreshCw, AlertCircle } from 'lucide-react'
+import { Sparkles, Sun, Moon, AlertCircle, ShieldCheck } from 'lucide-react'
 
 export default function App() {
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('scout_theme') || 'dark'
+  })
+
   const [influencers, setInfluencers] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -28,6 +32,21 @@ export default function App() {
   const [error, setError] = useState(null)
   const [selectedInfluencer, setSelectedInfluencer] = useState(null)
   const [mineModalOpen, setMineModalOpen] = useState(false)
+
+  // Gerenciamento de Tema (Dark / Light)
+  useEffect(() => {
+    const root = document.documentElement
+    if (theme === 'dark') {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+    localStorage.setItem('scout_theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }
 
   // Carregar dados de estatísticas
   const fetchStats = useCallback(async () => {
@@ -84,7 +103,6 @@ export default function App() {
 
   // Mudança inline de status na tabela
   const handleStatusChange = async (id, newStatus) => {
-    // Atualização otimista na tabela
     setInfluencers((prev) =>
       prev.map((i) => (i.id === id ? { ...i, status: newStatus } : i))
     )
@@ -102,7 +120,7 @@ export default function App() {
     }
   }
 
-  // Atualização a partir do Drawer (ex: notas ou telefone)
+  // Atualização a partir do Drawer (notas, telefone, calculadora de ROI)
   const handleDrawerUpdate = async (id, data) => {
     try {
       const res = await api.updateInfluencer(id, data)
@@ -127,35 +145,76 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-apple-bg text-white font-inter selection:bg-apple-blue selection:text-white">
+    <div
+      className="min-h-screen font-inter transition-colors duration-200"
+      style={{
+        backgroundColor: 'var(--bg-app)',
+        color: 'var(--text-primary)',
+      }}
+    >
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-apple-bg/80 backdrop-blur-md border-b border-apple-border px-6 py-3.5 flex items-center justify-between">
+      <header
+        className="sticky top-0 z-40 backdrop-blur-md border-b px-6 py-3.5 flex items-center justify-between transition-colors"
+        style={{
+          backgroundColor: 'var(--header-bg)',
+          borderColor: 'var(--border-color)',
+        }}
+      >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-500/20">
-            <Sparkles size={18} className="text-white" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 text-white">
+            <Sparkles size={18} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight text-white">Scout CRM</h1>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-apple-blue/15 text-apple-blue border border-apple-blue/30">
-                v1.0
+              <h1 className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                Scout CRM
+              </h1>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                v1.2
               </span>
             </div>
-            <p className="text-[11px] text-apple-muted">
-              Mineração, Triagem Anti-Bot e Abordagem de Influenciadores (.bet.br)
+            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Playbook de Mineração, Triagem Anti-Lixo e ROI de Stories (.bet.br)
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-apple-surface border border-apple-border text-[11px] text-apple-muted">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <div className="flex items-center gap-2.5">
+          {/* Badge de status do motor */}
+          <div
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-medium"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Motor de Triagem Ativo</span>
           </div>
 
+          {/* Theme Toggle (Dark / Light) */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-xl border transition-all hover:scale-105"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-muted)',
+            }}
+            title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
+          >
+            {theme === 'dark' ? (
+              <Sun size={16} className="text-amber-400" />
+            ) : (
+              <Moon size={16} className="text-zinc-600" />
+            )}
+          </button>
+
+          {/* Minerar Button */}
           <button
             onClick={() => setMineModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-apple-blue hover:bg-blue-500 text-white font-medium text-xs rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
           >
             <Sparkles size={14} />
             <span>Minerar</span>
@@ -167,17 +226,17 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Error Alert */}
         {error && (
-          <div className="p-4 bg-apple-red/10 border border-apple-red/30 rounded-2xl flex items-center gap-3 text-apple-red text-xs">
+          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs">
             <AlertCircle size={18} className="shrink-0" />
             <div className="flex-1">
-              <strong>Erro de Comunicação:</strong> {error}
+              <strong>Erro de Conexão:</strong> {error}
             </div>
             <button
               onClick={() => {
                 fetchStats()
                 fetchInfluencers(1, filters)
               }}
-              className="px-3 py-1 bg-apple-red/20 hover:bg-apple-red/30 rounded-lg font-medium transition-colors"
+              className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded-lg font-medium transition-colors"
             >
               Tentar Novamente
             </button>
@@ -219,14 +278,14 @@ export default function App() {
         </section>
       </main>
 
-      {/* Drawer Lateral */}
+      {/* Drawer Lateral com Calculadora de ROI e Scripts do Pedro */}
       <InfluencerDrawer
         influencer={selectedInfluencer}
         onClose={() => setSelectedInfluencer(null)}
         onUpdate={handleDrawerUpdate}
       />
 
-      {/* Modal de Mineração */}
+      {/* Modal de Mineração Inteligente */}
       <MineModal
         open={mineModalOpen}
         onClose={() => setMineModalOpen(false)}

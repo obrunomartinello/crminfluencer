@@ -12,10 +12,22 @@ let inMemoryInfluencers = MOCK_INFLUENCERS.map((inf, index) => {
     classification,
     status: 'Novo',
     user_notes: '',
+    story_views_avg: 0,
+    story_clicks_avg: 0,
+    story_asking_price: 0,
+    estimated_revenue: 0,
+    roi_verdict: null,
     created_at: new Date().toISOString(),
   }
 })
 let nextId = inMemoryInfluencers.length + 1
+
+const BASE_FIELDS = [
+  'username', 'full_name', 'profile_pic_url', 'bio', 'external_url',
+  'followers_count', 'following_count', 'posts_count', 'avg_reels_views',
+  'engagement_rate', 'whatsapp', 'email', 'has_competitor', 'competitor_name',
+  'niche', 'score', 'classification', 'status', 'user_notes',
+]
 
 const store = {
   isUsingSupabase() {
@@ -161,6 +173,19 @@ const store = {
           .single()
 
         if (!error && data) return data
+        // Se deu erro de coluna não existente no Supabase, tenta atualizar somente campos base
+        const cleanBody = {}
+        for (const k of Object.keys(body)) {
+          if (BASE_FIELDS.includes(k)) cleanBody[k] = body[k]
+        }
+        const { data: d2, error: e2 } = await supabase
+          .from('influencers')
+          .update(cleanBody)
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (!e2 && d2) return { ...d2, ...body }
       } catch (err) {
         console.warn('[store] Erro ao atualizar no Supabase, atualizando em memória:', err.message)
       }
@@ -196,11 +221,24 @@ const store = {
   async upsertInfluencer(item) {
     if (supabase) {
       try {
+        // Tenta upsert com todos os campos
         const { error } = await supabase
           .from('influencers')
           .upsert(item, { onConflict: 'username' })
 
         if (!error) return true
+
+        // Se falhou (ex: coluna nova ainda não criada no schema do Supabase), faz fallback para os campos padrão
+        const baseItem = {}
+        for (const k of BASE_FIELDS) {
+          if (item[k] !== undefined) baseItem[k] = item[k]
+        }
+        const { error: errBase } = await supabase
+          .from('influencers')
+          .upsert(baseItem, { onConflict: 'username' })
+
+        if (!errBase) return true
+        console.warn('[store] Erro upsert Supabase:', errBase.message)
       } catch (err) {
         console.warn('[store] Erro upsert Supabase, salvando em memória:', err.message)
       }
