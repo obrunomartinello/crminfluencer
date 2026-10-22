@@ -1,5 +1,6 @@
 const axios = require('axios')
 const cheerio = require('cheerio')
+const { UNDERAGE_TERMS } = require('./scoring')
 
 const COMPETITORS = [
   'blaze', 'betano', 'estrela bet', 'superbet', 'novibet', 'bet365',
@@ -27,12 +28,43 @@ const SHOPEE_TERMS = [
   'amzn.to', 'mercadolivre', 'mercado livre', 'magalu', 'shein',
 ]
 
+// Domínios de encurtadores comuns usados para esconder link de WhatsApp comercial
+const SHORTENER_DOMAINS = [
+  'wa.link', 'bit.ly', 'cutt.ly', 'linkr.bio', 'encurtador.com.br',
+  'tinyurl.com', 'is.gd', 'abre.ai', 'contate.me',
+]
+
 // Padrão de número brasileiro: +55 (opcional), DDD, 9XXXX-XXXX
 const BR_PHONE_REGEX = /(?:\+?55\s?)?\(?([1-9]{2})\)?\s?(9[0-9]{4})[-\s]?([0-9]{4})/
 
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+}
+
+/**
+ * Tenta resolver redirect de encurtador de link para pegar o link real de WhatsApp
+ * Sem baixar a página inteira (usando status 301/302 e header Location)
+ */
+async function resolveShortlink(shortUrl) {
+  try {
+    const res = await axios.get(shortUrl, {
+      maxRedirects: 0,
+      validateStatus: (status) => status >= 200 && status < 400,
+      headers: BROWSER_HEADERS,
+      timeout: 3000,
+    })
+    const location = res.headers?.location || ''
+    return location
+  } catch (_e) {
+    return null
+  }
+}
+
 /**
  * Inspeciona o link externo e a bio do influenciador
- * Detecta WhatsApp, Concorrentes, Agência, Rifas e Achadinhos
+ * Detecta WhatsApp, Concorrentes, Agência, Rifas, Achadinhos e Risco Menor de Idade
  */
 async function inspectLink(url, bio = '') {
   const result = {
@@ -42,12 +74,13 @@ async function inspectLink(url, bio = '') {
     isAgency: false,
     promotesRaffle: false,
     promotesShopee: false,
+    isUnderageRisk: false,
     redFlags: [],
   }
 
   const bioLower = (bio || '').toLowerCase()
 
-  // 1. Verificar Bio primeiro (muito importante)
+  // 1. Verificar Bio primeiro
   for (const term of AGENCY_TERMS) {
     if (bioLower.includes(term)) {
       result.isAgency = true
@@ -72,6 +105,14 @@ async function inspectLink(url, bio = '') {
     }
   }
 
+  for (const term of UNDERAGE_TERMS) {
+    if (bioLower.includes(term)) {
+      result.isUnderageRisk = true
+      result.redFlags.push(`Risco Menor de Idade (${term})`)
+      break
+    }
+  }
+
   for (const term of COMPETITORS) {
     if (bioLower.includes(term)) {
       result.hasCompetitor = true
@@ -86,28 +127,42 @@ async function inspectLink(url, bio = '') {
     result.whatsapp = `55${bioPhoneMatch[1]}${bioPhoneMatch[2]}${bioPhoneMatch[3]}`
   }
 
-  // 2. Se tiver link externo, inspecionar página HTML (Linktree, Beacons etc)
+  // 2. Se tiver link externo, inspecionar página HTML em camadas
   if (url && url.startsWith('http')) {
     try {
       const { data: html } = await axios.get(url, {
         timeout: 8000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; ScoutBot/1.0)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
+        headers: BROWSER_HEADERS,
       })
 
       const $ = cheerio.load(html)
-      const hrefs = []
+      const foundUrls = []
+
+      // Camada A: Links <a> normais do HTML
       $('a').each((_, el) => {
         const href = $(el).attr('href') || ''
-        hrefs.push(href.toLowerCase())
+        if (href) foundUrls.push(href)
       })
-      const allHrefs = hrefs.join('\n')
+
+      // Camada B: Next.js JSON (__NEXT_DATA__) embutido no Linktree / Beacons
+      const nextDataRaw = $('#__NEXT_DATA__').html()
+      if (nextDataRaw) {
+        try {
+          const nextJson = JSON.parse(nextDataRaw)
+          // Serializar e buscar URLs e textos embutidos no estado do React
+          const jsonString = JSON.stringify(nextJson)
+          const extractedLinks = jsonString.match(/https?:\/\/[^\s"'\\]+/g) || []
+          foundUrls.push(...extractedLinks)
+        } catch (_jsonErr) {
+          // ignora erro de parse
+        }
+      }
+
+      const allHrefs = foundUrls.map(u => u.toLowerCase()).join('\n')
       const pageText = $('body').text().toLowerCase()
       const allText = pageText + '\n' + allHrefs
 
-      // Extração de WhatsApp no Linktree
+      // Camada C: Extração de WhatsApp direto
       if (!result.whatsapp) {
         const waDirectMatch = allHrefs.match(/wa\.me\/(\d+)/)
         if (waDirectMatch) {
@@ -125,7 +180,25 @@ async function inspectLink(url, bio = '') {
         }
       }
 
-      // Detecção de Concorrentes no Linktree
+      // Camada D: Resolução de Encurtadores (bit.ly, wa.link, etc.) se WhatsApp ainda não encontrado
+      if (!result.whatsapp) {
+        const shortlinks = foundUrls.filter(u =>
+          SHORTENER_DOMAINS.some(domain => u.includes(domain))
+        ).slice(0, 3) // limitar a 3 para rapidez
+
+        for (const short of shortlinks) {
+          const destination = await resolveShortlink(short)
+          if (destination) {
+            const waMatch = destination.match(/wa\.me\/(\d+)/) || destination.match(/phone=(\d+)/)
+            if (waMatch) {
+              result.whatsapp = waMatch[1]
+              break
+            }
+          }
+        }
+      }
+
+      // Detecção de Concorrentes
       if (!result.hasCompetitor) {
         for (const term of COMPETITORS) {
           if (allText.includes(term)) {
@@ -136,7 +209,7 @@ async function inspectLink(url, bio = '') {
         }
       }
 
-      // Detecção de Rifas no Linktree
+      // Detecção de Rifas
       if (!result.promotesRaffle) {
         for (const term of RAFFLE_TERMS) {
           if (allText.includes(term)) {
@@ -147,12 +220,23 @@ async function inspectLink(url, bio = '') {
         }
       }
 
-      // Detecção de Achadinhos no Linktree
+      // Detecção de Achadinhos
       if (!result.promotesShopee) {
         for (const term of SHOPEE_TERMS) {
           if (allText.includes(term)) {
             result.promotesShopee = true
             result.redFlags.push(`Achadinhos no Linktree (${term})`)
+            break
+          }
+        }
+      }
+
+      // Detecção de Risco Menor de Idade no Link externo
+      if (!result.isUnderageRisk) {
+        for (const term of UNDERAGE_TERMS) {
+          if (allText.includes(term)) {
+            result.isUnderageRisk = true
+            result.redFlags.push(`Risco Menor de Idade no Linktree (${term})`)
             break
           }
         }
@@ -170,3 +254,4 @@ async function inspectLink(url, bio = '') {
 }
 
 module.exports = { inspectLink, COMPETITORS, AGENCY_TERMS, RAFFLE_TERMS, SHOPEE_TERMS }
+

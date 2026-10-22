@@ -98,6 +98,9 @@ const MOCK_INFLUENCERS = [
   },
 ]
 
+const { calculateTrimmedMedian } = require('./scoring')
+const supabase = require('../db/supabase')
+
 /**
  * Mapeia resultado completo do Apify instagram-profile-scraper
  */
@@ -105,21 +108,34 @@ function mapProfileResult(item) {
   const followersCount = item.followersCount || item.followers_count || 0
   const latestPosts = item.latestPosts || item.latestIgtvVideos || []
   
-  // Calcular média de views/engajamento dos Reels/Vídeos recentes
-  let totalViews = 0
-  let videoCount = 0
-  for (const post of latestPosts.slice(0, 6)) {
+  // 1. Extrair visualizações e métricas de engajamento dos últimos posts/Reels
+  const viewsList = []
+  let totalLikes = 0
+  let totalComments = 0
+
+  for (const post of latestPosts.slice(0, 10)) {
     const views = post.videoViewCount || post.videoPlayCount || (post.likesCount ? post.likesCount * 8 : 0)
     if (views > 0) {
-      totalViews += views
-      videoCount++
+      viewsList.push(views)
     }
+    if (post.likesCount) totalLikes += post.likesCount
+    if (post.commentsCount) totalComments += post.commentsCount
   }
 
-  const avgReelsViews = videoCount > 0 ? Math.round(totalViews / videoCount) : (item.avgReelsViews || 0)
+  // Mediana Recortada (Trimmed Median) para evitar distorção de 1 Reels que viralizou no Explorar
+  const avgReelsViews = viewsList.length > 0 
+    ? calculateTrimmedMedian(viewsList) 
+    : (item.avgReelsViews || 0)
+
   const engagementRate = followersCount > 0
     ? Math.round((avgReelsViews / followersCount) * 10000) / 100
     : 0
+
+  // 2. Detecção de "Índice de Vaidade / Compra de Curtidas":
+  // Se tem muitas curtidas mas a razão Comentários / Curtidas < 0.4% (padrão de robôs/engajamento comprado)
+  const suspiciousEngagement = totalLikes > 500 && totalComments > 0 
+    ? (totalComments / totalLikes) < 0.004
+    : false
 
   const bio = item.biography || item.bio || ''
   const bioLower = bio.toLowerCase()
@@ -156,6 +172,7 @@ function mapProfileResult(item) {
     is_agency: !!isAgency,
     promotes_raffle: !!promotesRaffle,
     promotes_shopee: !!promotesShopee,
+    suspicious_engagement: suspiciousEngagement,
     related_profiles: item.relatedProfiles || [],
   }
 }
@@ -179,7 +196,6 @@ async function runMiningActor(query, count = 25) {
 
   try {
     // 1. Minerar o perfil semente via instagram-profile-scraper
-    // Isso traz a ficha completa E a lista de Contas Sugeridas (Lookalike do Pedro)
     const run = await client.actor('apify/instagram-profile-scraper').call({
       usernames: [cleanQuery],
     }, { waitSecs: 45 })
@@ -189,12 +205,32 @@ async function runMiningActor(query, count = 25) {
 
     // Se o perfil semente tiver contas sugeridas e o usuário pediu mais perfis:
     if (profiles.length > 0 && profiles[0].related_profiles && profiles[0].related_profiles.length > 0 && count > 1) {
-      const suggestedUsernames = profiles[0].related_profiles
+      let suggestedUsernames = profiles[0].related_profiles
         .map(r => r.username)
         .filter(Boolean)
         .slice(0, count - 1)
 
       console.log(`[apify] Encontradas ${suggestedUsernames.length} Contas Sugeridas pelo Instagram:`, suggestedUsernames)
+
+      // DEDUPLICAÇÃO DE LOOKALIKES NO BANCO:
+      // Evita gastar créditos da Apify raspando perfis que já existem no Supabase
+      if (supabase && suggestedUsernames.length > 0) {
+        try {
+          const { data: existing } = await supabase
+            .from('influencers')
+            .select('username')
+            .in('username', suggestedUsernames)
+
+          if (existing && existing.length > 0) {
+            const existingSet = new Set(existing.map(e => e.username.toLowerCase()))
+            const beforeCount = suggestedUsernames.length
+            suggestedUsernames = suggestedUsernames.filter(u => !existingSet.has(u.toLowerCase()))
+            console.log(`[apify] 💰 Economia de Créditos: ${beforeCount - suggestedUsernames.length} perfis sugeridos já constam no banco e foram ignorados.`)
+          }
+        } catch (_dupErr) {
+          // ignora erro de checagem
+        }
+      }
 
       if (suggestedUsernames.length > 0) {
         try {
@@ -210,6 +246,7 @@ async function runMiningActor(query, count = 25) {
         }
       }
     }
+
 
     // Se o profile scraper não achou ou a query não era um username direto, fallback para hashtag
     if (profiles.length === 0) {

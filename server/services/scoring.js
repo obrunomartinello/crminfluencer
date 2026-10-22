@@ -1,5 +1,37 @@
+// Termos de apelo infantil / menor de idade proibidos pela Portaria SPA/MF (.bet.br)
+const UNDERAGE_TERMS = [
+  'roblox', 'free fire', 'freefire', 'minecraft', '14y', '15y', '16y', '17y',
+  'escola', 'colegio', 'colégio', 'terceirao', 'terceirão', 'ensino médio',
+  'ensino medio', 'menor de idade', 'infantil', 'kids', 'teen', 'enem',
+]
+
 /**
- * calculateScore — motor refinado com o Playbook do Pedro
+ * Calcula a Mediana Recortada (Trimmed Median) de uma lista de números
+ * Remove os maiores picos virais de Reels (que distorcem a média) e os menores
+ * @param {number[]} values 
+ * @returns {number}
+ */
+function calculateTrimmedMedian(values) {
+  if (!values || values.length === 0) return 0
+  if (values.length <= 3) {
+    return Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+  }
+
+  // Ordenar valores de forma crescente
+  const sorted = [...values].sort((a, b) => a - b)
+  
+  // Descartar o maior pico (outlier viral) e o menor (vídeo flopado)
+  const trimmed = sorted.slice(1, sorted.length - 1)
+  
+  const mid = Math.floor(trimmed.length / 2)
+  if (trimmed.length % 2 !== 0) {
+    return trimmed[mid]
+  }
+  return Math.round((trimmed[mid - 1] + trimmed[mid]) / 2)
+}
+
+/**
+ * calculateScore — motor refinado com o Playbook do Pedro + Portaria SPA/MF
  * @param {Object} inf - influencer object
  * @returns {{ score: number, classification: string, tags: string[] }}
  */
@@ -8,13 +40,26 @@ function calculateScore(inf) {
   const engagementRate = followers > 0 ? (inf.engagement_rate || 0) : 0
   const tags = []
 
-  // 1. Penalidade Anti-Bot: seguidores comprados / fantasma
+  // 1. FILTRO REGULATÓRIO .BET.BR (Portaria SPA/MF): Risco de Menor de Idade
+  const bioLower = (inf.bio || '').toLowerCase()
+  const isUnderageRisk = UNDERAGE_TERMS.some(term => bioLower.includes(term))
+  if (isUnderageRisk) {
+    tags.push('🚫 Risco SPA/MF (Apelo Infantil/Menor)')
+    return { score: 0, classification: 'LIXO', tags }
+  }
+
+  // 2. Penalidade Anti-Bot: seguidores comprados / fantasma (<2% com >10k)
   if (followers > 10_000 && engagementRate < 2) {
     tags.push('Bot / Seguidor Fantasma')
     return { score: 10, classification: 'LIXO', tags }
   }
 
-  // 2. Penalidade Agência / Assessoria (Pedro quer "o cara povão / solto")
+  // 3. Penalidade de Índice de Vaidade (Comentários / Likes < 0.4% indica compra de likes)
+  if (inf.suspicious_engagement) {
+    tags.push('⚠️ Poucos Comentários (Suspeita Compra de Likes)')
+  }
+
+  // 4. Penalidade Agência / Assessoria (Pedro quer "o cara povão / solto")
   if (inf.is_agency) {
     tags.push('Agência / Assessoria')
     return { score: 15, classification: 'LIXO', tags }
@@ -31,7 +76,7 @@ function calculateScore(inf) {
     tags.push('Grande Porte (120k-200k)')
   }
 
-  // +35: Engajamento alto em Reels (≥15%)
+  // +35: Engajamento alto em Reels/Vídeos (≥15%)
   if (engagementRate >= 15) {
     score += 35
     tags.push('Alto Engajamento Reels')
@@ -65,6 +110,11 @@ function calculateScore(inf) {
     tags.push('⚠️ Achadinhos / Shopee')
   }
 
+  // Penalidade de engajamento suspeito
+  if (inf.suspicious_engagement) {
+    score = Math.max(0, score - 15)
+  }
+
   // Classificação final
   let classification
   if (score >= 75) classification = 'OURO'
@@ -75,4 +125,5 @@ function calculateScore(inf) {
   return { score, classification, tags }
 }
 
-module.exports = { calculateScore }
+module.exports = { calculateScore, calculateTrimmedMedian, UNDERAGE_TERMS }
+
