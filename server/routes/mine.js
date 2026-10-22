@@ -42,11 +42,19 @@ router.post('/', async (req, res) => {
           promotes_shopee: profile.promotes_shopee || linkData.promotesShopee,
         }
 
-        // Calcular pontuação refinada com filtros anti-lixo
-        const { score, classification } = calculateScore(enriched)
+        // Calcular pontuação refinada com filtros anti-lixo e projeção de Stories
+        const { score, classification, positives, tags, metrics } = calculateScore(enriched, linkData)
 
-        // Upsert no store (Supabase PostgreSQL ou in-memory)
-        await store.upsertInfluencer({ ...enriched, score, classification })
+        // Upsert no store (Supabase PostgreSQL ou in-memory) com métricas de Stories do Pedro
+        await store.upsertInfluencer({
+          ...enriched,
+          score,
+          classification,
+          story_views_avg: metrics?.estimatedStoryViews || 0,
+          story_clicks_avg: metrics?.estimatedStoryClicks || 0,
+          estimated_revenue: metrics?.projectedRevenueBRL || 0,
+          user_notes: positives?.length > 0 ? `Tags: ${tags.join(', ')} | ${positives.slice(0, 2).join(' • ')}` : '',
+        })
         imported++
       } catch (profileErr) {
         console.error(`[mine] Erro no perfil @${profile.username}:`, profileErr.message)
