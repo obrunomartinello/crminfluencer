@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, Sparkles, SlidersHorizontal, RotateCw, ChevronDown } from 'lucide-react'
+import { Search, Sparkles, SlidersHorizontal, RotateCw, ChevronDown, UserPlus } from 'lucide-react'
 
 export default function FilterBar({
   filters,
   onFilterChange,
   onMineClick,
+  onAddLeadClick,
   onRefresh,
   loading,
 }) {
@@ -122,10 +123,19 @@ export default function FilterBar({
         {/* Minerar Button */}
         <button
           onClick={onMineClick}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-xs px-4 py-2 rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-xs px-3.5 py-2 rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
         >
           <Sparkles size={14} />
-          <span>Minerar Criadores</span>
+          <span>Minerar Lookalikes</span>
+        </button>
+
+        {/* Adicionar Criador Manual */}
+        <button
+          onClick={onAddLeadClick}
+          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-3.5 py-2 rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+        >
+          <UserPlus size={14} />
+          <span>+ Novo Lead</span>
         </button>
       </div>
     </div>

@@ -5,7 +5,8 @@ import FilterBar from './components/FilterBar'
 import InfluencerTable from './components/InfluencerTable'
 import InfluencerDrawer from './components/InfluencerDrawer'
 import MineModal from './components/MineModal'
-import { Sparkles, Sun, Moon, AlertCircle, ShieldCheck } from 'lucide-react'
+import CreateLeadModal from './components/CreateLeadModal'
+import { Sparkles, Sun, Moon, AlertCircle, ShieldCheck, UserPlus } from 'lucide-react'
 
 export default function App() {
   const [theme, setTheme] = useState(() => {
@@ -32,6 +33,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [selectedInfluencer, setSelectedInfluencer] = useState(null)
   const [mineModalOpen, setMineModalOpen] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
 
   // Gerenciamento de Tema (Dark / Light)
   useEffect(() => {
@@ -144,6 +146,14 @@ export default function App() {
     return res
   }
 
+  // Cadastro Manual de Criador / Parceiro
+  const handleCreateLead = async (leadData) => {
+    const res = await api.createInfluencer(leadData)
+    await fetchStats()
+    await fetchInfluencers(1, filters)
+    return res
+  }
+
   return (
     <div
       className="min-h-screen font-inter transition-colors duration-200"
@@ -211,6 +221,15 @@ export default function App() {
             )}
           </button>
 
+          {/* Adicionar Lead Button */}
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+          >
+            <UserPlus size={14} />
+            <span>+ Novo Lead</span>
+          </button>
+
           {/* Minerar Button */}
           <button
             onClick={() => setMineModalOpen(true)}
@@ -254,6 +273,7 @@ export default function App() {
             filters={filters}
             onFilterChange={handleFilterChange}
             onMineClick={() => setMineModalOpen(true)}
+            onAddLeadClick={() => setCreateModalOpen(true)}
             onRefresh={() => {
               fetchStats()
               fetchInfluencers(page, filters)
@@ -274,6 +294,7 @@ export default function App() {
             onStatusChange={handleStatusChange}
             loading={loading}
             onMineClick={() => setMineModalOpen(true)}
+            onAddLeadClick={() => setCreateModalOpen(true)}
           />
         </section>
       </main>
@@ -290,6 +311,13 @@ export default function App() {
         open={mineModalOpen}
         onClose={() => setMineModalOpen(false)}
         onMine={handleMine}
+      />
+
+      {/* Modal de Cadastro Manual de Criador */}
+      <CreateLeadModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreated={handleCreateLead}
       />
     </div>
   )

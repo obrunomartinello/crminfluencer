@@ -28,6 +28,8 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate }) {
   // Estados da Calculadora de ROI do Pedro
   const [clicks, setClicks] = useState(0)
   const [askingPrice, setAskingPrice] = useState(0)
+  const [paidAmount, setPaidAmount] = useState(0)
+  const [revenueGenerated, setRevenueGenerated] = useState(0)
 
   useEffect(() => {
     if (influencer) {
@@ -35,6 +37,8 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate }) {
       setCustomPhone(influencer.whatsapp || '')
       setClicks(influencer.story_clicks_avg || 0)
       setAskingPrice(influencer.story_asking_price || 0)
+      setPaidAmount(influencer.paid_amount || 0)
+      setRevenueGenerated(influencer.revenue_generated || 0)
     }
   }, [influencer])
 
@@ -108,6 +112,8 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate }) {
         story_clicks_avg: clicksNum,
         story_asking_price: priceNum,
         estimated_revenue: estimatedRevenue,
+        paid_amount: Number(paidAmount) || 0,
+        revenue_generated: Number(revenueGenerated) || 0,
         roi_verdict: roiStatus === 'fechar' ? 'FECHAR' : roiStatus === 'negociar' ? 'NEGOCIAR' : 'DESCARTAR',
       })
     } finally {
@@ -342,6 +348,69 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate }) {
                 >
                   {roiText}
                 </span>
+              </div>
+            </div>
+
+            {/* Histórico Financeiro Real (Pago vs Voltou) */}
+            <div className="pt-2 border-t space-y-2 text-xs" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[11px]" style={{ color: 'var(--text-primary)' }}>
+                  Histórico Real da Ação (Pós-Campanha)
+                </span>
+                {(Number(paidAmount) > 0 || Number(revenueGenerated) > 0) && (
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      (Number(revenueGenerated) - Number(paidAmount)) >= 0
+                        ? 'bg-emerald-500/15 text-emerald-500'
+                        : 'bg-red-500/15 text-red-500'
+                    }`}
+                  >
+                    {(Number(revenueGenerated) - Number(paidAmount)) >= 0
+                      ? `Lucro: +${formatMoney(Number(revenueGenerated) - Number(paidAmount))}`
+                      : `Prejuízo: ${formatMoney(Number(revenueGenerated) - Number(paidAmount))}`}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text-muted)' }}>
+                    Cachê Pago (R$)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(e.target.value)}
+                    placeholder="ex: 500"
+                    className="w-full px-3 py-1.5 border rounded-lg font-semibold"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text-muted)' }}>
+                    Retorno Gerado (R$)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={revenueGenerated}
+                    onChange={(e) => setRevenueGenerated(e.target.value)}
+                    placeholder="ex: 1520"
+                    className="w-full px-3 py-1.5 border rounded-lg font-semibold"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
               </div>
             </div>
 

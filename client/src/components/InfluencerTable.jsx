@@ -8,10 +8,13 @@ import {
   ShieldAlert,
   Sparkles,
   Inbox,
-  AlertTriangle,
   Building2,
   Ticket,
   ShoppingBag,
+  TrendingUp,
+  TrendingDown,
+  UserPlus,
+  MessageSquare,
 } from 'lucide-react'
 
 export default function InfluencerTable({
@@ -24,27 +27,30 @@ export default function InfluencerTable({
   onStatusChange,
   loading = false,
   onMineClick,
+  onAddLeadClick,
 }) {
   const formatNum = (num) => new Intl.NumberFormat('pt-BR').format(num || 0)
+  const formatMoney = (val) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 
   const getEngagementBadge = (rate) => {
     const r = parseFloat(rate) || 0
     if (r >= 15) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
           {r.toFixed(1)}%
         </span>
       )
     }
     if (r >= 5) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
           {r.toFixed(1)}%
         </span>
       )
     }
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25">
         {r.toFixed(1)}%
       </span>
     )
@@ -54,26 +60,26 @@ export default function InfluencerTable({
     switch (cls) {
       case 'OURO':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 shadow-sm">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 shadow-sm">
             💎 OURO <span className="opacity-75">({score})</span>
           </span>
         )
       case 'PRATA':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border border-zinc-400/30">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border border-zinc-400/30">
             🥈 PRATA <span className="opacity-75">({score})</span>
           </span>
         )
       case 'BRONZE':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-500/15 text-orange-700 dark:text-orange-400 border border-orange-500/30">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/15 text-orange-700 dark:text-orange-400 border border-orange-500/30">
             🥉 BRONZE <span className="opacity-75">({score})</span>
           </span>
         )
       case 'LIXO':
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25">
             🗑️ LIXO <span className="opacity-75">({score})</span>
           </span>
         )
@@ -98,10 +104,27 @@ export default function InfluencerTable({
     }
   }
 
+  if (loading && influencers.length === 0) {
+    return (
+      <div
+        className="rounded-2xl border p-12 text-center transition-colors"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-color)',
+        }}
+      >
+        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Carregando base de criadores...
+        </p>
+      </div>
+    )
+  }
+
   if (!loading && influencers.length === 0) {
     return (
       <div
-        className="border rounded-2xl p-12 text-center shadow-sm"
+        className="rounded-2xl border p-12 text-center transition-colors"
         style={{
           backgroundColor: 'var(--bg-card)',
           borderColor: 'var(--border-color)',
@@ -118,18 +141,27 @@ export default function InfluencerTable({
           <Inbox size={26} />
         </div>
         <h4 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-          Nenhum influenciador encontrado
+          Nenhum criador cadastrado
         </h4>
         <p className="text-xs max-w-sm mx-auto mb-5" style={{ color: 'var(--text-muted)' }}>
-          Use o botão abaixo para minerar perfis autênticos ou explore contas sugeridas de criadores do seu nicho.
+          Cadastre os parceiros que você já tem ou inicie uma mineração automática de novos criadores.
         </p>
-        <button
-          onClick={onMineClick}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-xl transition-all shadow-md shadow-blue-500/20"
-        >
-          <Sparkles size={14} />
-          <span>Iniciar Mineração</span>
-        </button>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={onAddLeadClick}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-xl transition-all shadow-md shadow-emerald-500/20"
+          >
+            <UserPlus size={14} />
+            <span>+ Cadastrar Manual</span>
+          </button>
+          <button
+            onClick={onMineClick}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-xl transition-all shadow-md shadow-blue-500/20"
+          >
+            <Sparkles size={14} />
+            <span>Minerar Criadores</span>
+          </button>
+        </div>
       </div>
     )
   }
@@ -142,9 +174,8 @@ export default function InfluencerTable({
         borderColor: 'var(--border-color)',
       }}
     >
-      {/* Table responsive container */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr
               className="border-b font-semibold"
@@ -154,15 +185,15 @@ export default function InfluencerTable({
                 color: 'var(--text-muted)',
               }}
             >
-              <th className="py-3.5 px-4">Criador</th>
-              <th className="py-3.5 px-3">Seguidores</th>
-              <th className="py-3.5 px-3">Média Reels</th>
-              <th className="py-3.5 px-3">Engajamento</th>
-              <th className="py-3.5 px-3">WhatsApp</th>
-              <th className="py-3.5 px-3">Filtro do Pedro</th>
-              <th className="py-3.5 px-3">Lead Score</th>
-              <th className="py-3.5 px-3">Pipeline</th>
-              <th className="py-3.5 px-4 text-right">Ação</th>
+              <th className="py-3 px-4">Criador</th>
+              <th className="py-3 px-3">Audiência</th>
+              <th className="py-3 px-3">Stories & Cliques</th>
+              <th className="py-3 px-3">Financeiro (Pago vs Voltou)</th>
+              <th className="py-3 px-3">SDR & Bio</th>
+              <th className="py-3 px-3">Lead Score</th>
+              <th className="py-3 px-3">Pipeline</th>
+              <th className="py-3 px-3">Observações</th>
+              <th className="py-3 px-4 text-right">Ação</th>
             </tr>
           </thead>
           <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
@@ -170,6 +201,11 @@ export default function InfluencerTable({
               const initials = (inf.full_name || inf.username || '?')
                 .slice(0, 2)
                 .toUpperCase()
+
+              const paidNum = parseFloat(inf.paid_amount) || 0
+              const revNum = parseFloat(inf.revenue_generated) || 0
+              const hasFinancialData = paidNum > 0 || revNum > 0
+              const netProfit = revNum - paidNum
 
               return (
                 <tr
@@ -209,51 +245,89 @@ export default function InfluencerTable({
                         >
                           {inf.full_name || inf.username}
                         </div>
-                        <a
-                          href={`https://instagram.com/${inf.username}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="hover:underline flex items-center gap-1 text-[11px] truncate transition-colors"
-                          style={{ color: 'var(--text-muted)' }}
-                        >
-                          @{inf.username}
-                          <ExternalLink size={10} className="shrink-0" />
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`https://instagram.com/${inf.username}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:underline flex items-center gap-0.5 text-[11px] truncate transition-colors"
+                            style={{ color: 'var(--text-muted)' }}
+                          >
+                            @{inf.username}
+                            <ExternalLink size={9} className="shrink-0" />
+                          </a>
+                          {inf.niche && inf.niche !== 'Geral' && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-500/10 text-zinc-500">
+                              {inf.niche}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
 
-                  {/* Seguidores */}
-                  <td className="py-3 px-3 font-semibold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
-                    {formatNum(inf.followers_count)}
-                  </td>
-
-                  {/* Média Reels */}
-                  <td className="py-3 px-3 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                    {formatNum(inf.avg_reels_views)}
-                  </td>
-
-                  {/* Taxa Engajamento */}
+                  {/* Audiência (Seguidores + Engajamento) */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    {getEngagementBadge(inf.engagement_rate)}
+                    <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {formatNum(inf.followers_count)}
+                    </div>
+                    <div className="mt-0.5">
+                      {getEngagementBadge(inf.engagement_rate)}
+                    </div>
                   </td>
 
-                  {/* WhatsApp */}
+                  {/* Stories & Cliques */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    {inf.whatsapp ? (
-                      <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                        <Phone size={12} className="shrink-0" />
-                        <span>Detectado</span>
-                      </span>
+                    <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {inf.story_views_avg > 0 ? `${formatNum(inf.story_views_avg)} views` : '—'}
+                    </div>
+                    <div className="text-[11px] font-medium text-blue-500">
+                      {inf.story_clicks_avg > 0 ? `~${formatNum(inf.story_clicks_avg)} cliques` : '—'}
+                    </div>
+                  </td>
+
+                  {/* Financeiro do Pedro (Pago vs Voltou) */}
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    {hasFinancialData ? (
+                      <div className="flex flex-col gap-0.5">
+                        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          Pago: <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(paidNum)}</span>
+                        </div>
+                        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          Voltou: <span className="font-semibold text-emerald-500">{formatMoney(revNum)}</span>
+                        </div>
+                        <div>
+                          <span
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                              netProfit >= 0
+                                ? 'bg-emerald-500/15 text-emerald-500'
+                                : 'bg-red-500/15 text-red-500'
+                            }`}
+                          >
+                            {netProfit >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                            {netProfit >= 0 ? `+${formatMoney(netProfit)}` : formatMoney(netProfit)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : inf.estimated_revenue > 0 ? (
+                      <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        Proj: <span className="font-semibold text-blue-400">{formatMoney(inf.estimated_revenue)}</span>
+                      </div>
                     ) : (
                       <span style={{ color: 'var(--text-muted)' }}>—</span>
                     )}
                   </td>
 
-                  {/* Filtro do Pedro (Anti-Lixo + Concorrência) */}
+                  {/* SDR & Bio (Anti-Lixo + Concorrência + WhatsApp) */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     <div className="flex flex-col gap-1 items-start">
+                      {inf.whatsapp && (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          <Phone size={10} className="shrink-0" />
+                          <span>WhatsApp</span>
+                        </span>
+                      )}
                       {inf.is_agency && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25">
                           <Building2 size={10} /> Agência
@@ -272,7 +346,7 @@ export default function InfluencerTable({
                       {!inf.is_agency && !inf.promotes_raffle && !inf.promotes_shopee && (
                         inf.has_competitor ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25">
-                            <ShieldAlert size={11} className="shrink-0" />
+                            <ShieldAlert size={10} className="shrink-0" />
                             <span>{inf.competitor_name || 'Concorrente'}</span>
                           </span>
                         ) : (
@@ -307,6 +381,17 @@ export default function InfluencerTable({
                     </select>
                   </td>
 
+                  {/* Observações */}
+                  <td className="py-3 px-3 max-w-[180px]">
+                    {inf.user_notes ? (
+                      <p className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }} title={inf.user_notes}>
+                        {inf.user_notes}
+                      </p>
+                    ) : (
+                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </td>
+
                   {/* Ações */}
                   <td className="py-3 px-4 text-right whitespace-nowrap">
                     <button
@@ -320,7 +405,7 @@ export default function InfluencerTable({
                         borderColor: 'var(--border-color)',
                         color: 'var(--text-muted)',
                       }}
-                      title="Ver ficha e calculadora de ROI"
+                      title="Abrir ficha, roteiros e ROI"
                     >
                       <Eye size={14} />
                     </button>

@@ -253,5 +253,81 @@ async function inspectLink(url, bio = '') {
   return result
 }
 
-module.exports = { inspectLink, COMPETITORS, AGENCY_TERMS, RAFFLE_TERMS, SHOPEE_TERMS }
+/**
+ * Análise rápida em memória (0ms, sem bloqueios de rede) para bio e URL
+ * Garante que a ingestão de 50 leads aconteça em milissegundos
+ */
+function fastInspectBio(bio = '', externalUrl = '') {
+  const result = {
+    whatsapp: null,
+    hasCompetitor: false,
+    competitorName: null,
+    isAgency: false,
+    promotesRaffle: false,
+    promotesShopee: false,
+    isUnderageRisk: false,
+    redFlags: [],
+  }
+
+  const allText = `${bio || ''} ${externalUrl || ''}`.toLowerCase()
+
+  for (const term of AGENCY_TERMS) {
+    if (allText.includes(term)) {
+      result.isAgency = true
+      result.redFlags.push(`Agência/Assessoria (${term})`)
+      break
+    }
+  }
+
+  for (const term of RAFFLE_TERMS) {
+    if (allText.includes(term)) {
+      result.promotesRaffle = true
+      result.redFlags.push(`Rifas/Sorteios (${term})`)
+      break
+    }
+  }
+
+  for (const term of SHOPEE_TERMS) {
+    if (allText.includes(term)) {
+      result.promotesShopee = true
+      result.redFlags.push(`Achadinhos (${term})`)
+      break
+    }
+  }
+
+  for (const term of UNDERAGE_TERMS) {
+    if (allText.includes(term)) {
+      result.isUnderageRisk = true
+      result.redFlags.push(`Risco Menor de Idade (${term})`)
+      break
+    }
+  }
+
+  for (const term of COMPETITORS) {
+    if (allText.includes(term)) {
+      result.hasCompetitor = true
+      result.competitorName = term
+      break
+    }
+  }
+
+  // Extração rápida de WhatsApp no texto ou link
+  const waDirectMatch = allText.match(/wa\.me\/(\d+)/) || allText.match(/api\.whatsapp\.com\/send[^&]*phone=(\d+)/)
+  if (waDirectMatch) {
+    result.whatsapp = waDirectMatch[1]
+  } else {
+    const phoneMatch = BR_PHONE_REGEX.exec(allText)
+    if (phoneMatch) {
+      result.whatsapp = `55${phoneMatch[1]}${phoneMatch[2]}${phoneMatch[3]}`
+    }
+  }
+
+  if (result.whatsapp) {
+    result.whatsapp = result.whatsapp.replace(/\D/g, '')
+  }
+
+  return result
+}
+
+module.exports = { inspectLink, fastInspectBio, COMPETITORS, AGENCY_TERMS, RAFFLE_TERMS, SHOPEE_TERMS }
 

@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const store = require('../db/store')
 const { runMiningActor } = require('../services/apify')
-const { inspectLink } = require('../services/linktree')
+const { fastInspectBio } = require('../services/linktree')
 const { calculateScore } = require('../services/scoring')
 
 // POST /api/mine
@@ -16,21 +16,20 @@ router.post('/', async (req, res) => {
 
     const countNum = Math.min(Math.max(parseInt(count) || 25, 1), 100)
 
-    console.log(`[mine] Iniciando varredura com Playbook do Pedro: query="${query}", count=${countNum}`)
+    console.log(`[mine] Iniciando varredura rápida: query="${query}", count=${countNum}`)
 
-    // 1. Minerar perfis completos via Apify
+    // 1. Minerar perfis via Apify
     const profiles = await runMiningActor(query.trim(), countNum)
 
-    console.log(`[mine] ${profiles.length} perfis recebidos — iniciando enriquecimento e auditoria...`)
+    console.log(`[mine] ${profiles.length} perfis recebidos — processando e salvando...`)
 
     let imported = 0
     let skipped = 0
 
-    // 2. Enriquecer e auditar cada perfil
+    // 2. Enriquecimento ultra-rápido (em memória, sem travar rede) e salvar todos
     for (const profile of profiles) {
       try {
-        // Inspecionar link externo E bio (detecta WhatsApp, Concorrentes, Agência, Rifa, Shopee)
-        const linkData = await inspectLink(profile.external_url, profile.bio)
+        const linkData = fastInspectBio(profile.bio, profile.external_url)
 
         const enriched = {
           ...profile,
@@ -42,10 +41,10 @@ router.post('/', async (req, res) => {
           promotes_shopee: profile.promotes_shopee || linkData.promotesShopee,
         }
 
-        // Calcular pontuação refinada com filtros anti-lixo e projeção de Stories
+        // Calcular pontuação e tags do SDR
         const { score, classification, positives, tags, metrics } = calculateScore(enriched, linkData)
 
-        // Upsert no store (Supabase PostgreSQL ou in-memory) com métricas de Stories do Pedro
+        // Salvar lead na base
         await store.upsertInfluencer({
           ...enriched,
           score,
@@ -53,7 +52,7 @@ router.post('/', async (req, res) => {
           story_views_avg: metrics?.estimatedStoryViews || 0,
           story_clicks_avg: metrics?.estimatedStoryClicks || 0,
           estimated_revenue: metrics?.projectedRevenueBRL || 0,
-          user_notes: positives?.length > 0 ? `Tags: ${tags.join(', ')} | ${positives.slice(0, 2).join(' • ')}` : '',
+          user_notes: positives?.length > 0 ? `Tags: ${tags.join(', ')}` : '',
         })
         imported++
       } catch (profileErr) {
@@ -62,9 +61,10 @@ router.post('/', async (req, res) => {
       }
     }
 
-    console.log(`[mine] Concluído com sucesso: ${imported} importados, ${skipped} pulados`)
+    console.log(`[mine] Concluído: ${imported} importados com sucesso`)
     res.json({ imported, skipped })
   } catch (err) {
+    console.error('❌ [mine] Erro geral na rota:', err.message)
     res.status(500).json({ error: err.message })
   }
 })

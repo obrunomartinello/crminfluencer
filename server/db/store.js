@@ -27,6 +27,16 @@ const BASE_FIELDS = [
   'followers_count', 'following_count', 'posts_count', 'avg_reels_views',
   'engagement_rate', 'whatsapp', 'email', 'has_competitor', 'competitor_name',
   'niche', 'score', 'classification', 'status', 'user_notes',
+  'story_views_avg', 'story_clicks_avg', 'story_asking_price', 'estimated_revenue',
+  'roi_verdict', 'paid_amount', 'revenue_generated', 'last_campaign_date',
+  'is_agency', 'promotes_raffle', 'promotes_shopee',
+]
+
+const CORE_FIELDS = [
+  'username', 'full_name', 'profile_pic_url', 'bio', 'external_url',
+  'followers_count', 'following_count', 'posts_count', 'avg_reels_views',
+  'engagement_rate', 'whatsapp', 'email', 'has_competitor', 'competitor_name',
+  'niche', 'score', 'classification', 'status', 'user_notes',
 ]
 
 const store = {
@@ -152,6 +162,19 @@ const store = {
           .single()
 
         if (!error && data) return data
+
+        // Fallback para campos básicos caso colunas novas ainda não existam no Supabase
+        const coreRecord = {}
+        for (const k of CORE_FIELDS) {
+          if (newRecord[k] !== undefined) coreRecord[k] = newRecord[k]
+        }
+        const { data: dCore, error: errCore } = await supabase
+          .from('influencers')
+          .insert(coreRecord)
+          .select()
+          .single()
+
+        if (!errCore && dCore) return { ...dCore, ...newRecord }
       } catch (err) {
         console.warn('[store] Erro ao inserir no Supabase, salvando em memória:', err.message)
       }

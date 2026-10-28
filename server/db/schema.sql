@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS public.influencers (
   story_asking_price NUMERIC(10,2) DEFAULT 0,
   estimated_revenue NUMERIC(10,2) DEFAULT 0,
   roi_verdict       VARCHAR(30),
+  -- Métricas Financeiras e Operacionais do Pedro
+  paid_amount       NUMERIC(10,2) DEFAULT 0,
+  revenue_generated NUMERIC(10,2) DEFAULT 0,
+  last_campaign_date DATE,
   -- Filtros Anti-Lixo do Pedro
   is_agency         BOOLEAN DEFAULT FALSE,
   promotes_raffle   BOOLEAN DEFAULT FALSE,
@@ -41,6 +45,9 @@ ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS story_clicks_avg INTEGER
 ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS story_asking_price NUMERIC(10,2) DEFAULT 0;
 ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS estimated_revenue NUMERIC(10,2) DEFAULT 0;
 ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS roi_verdict VARCHAR(30);
+ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS revenue_generated NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS last_campaign_date DATE;
 ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS is_agency BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS promotes_raffle BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS promotes_shopee BOOLEAN DEFAULT FALSE;
