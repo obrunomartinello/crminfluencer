@@ -310,7 +310,10 @@ export default function App() {
       <MineModal
         open={mineModalOpen}
         onClose={() => setMineModalOpen(false)}
-        onMine={handleMine}
+        onComplete={() => {
+          fetchStats()
+          fetchInfluencers(1, filters)
+        }}
       />
 
       {/* Modal de Cadastro Manual de Criador */}

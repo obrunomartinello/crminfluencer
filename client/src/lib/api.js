@@ -62,7 +62,20 @@ export const api = {
     })
   },
 
-  // Disparar mineração com Apify
+  // Iniciar varredura assíncrona (Search Scraper por Palavra-Chave)
+  async startMine(query, count = 25) {
+    return request('/mine/start', {
+      method: 'POST',
+      body: JSON.stringify({ query, count }),
+    })
+  },
+
+  // Consultar status da varredura
+  async getMineStatus(jobId) {
+    return request(`/mine/status/${jobId}`)
+  },
+
+  // Disparar mineração com Apify (Legado/Síncrono)
   async mine(query, count = 25) {
     return request('/mine', {
       method: 'POST',
