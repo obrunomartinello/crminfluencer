@@ -18,8 +18,8 @@ router.get('/stats', async (req, res) => {
 // GET /api/influencers — com filtros e paginação
 router.get('/', async (req, res) => {
   try {
-    const { search, status, classification, page = 1, limit = 20 } = req.query
-    const result = await store.listInfluencers({ search, status, classification, page, limit })
+    const { search, status, classification, minFollowers, hideAgencies, page = 1, limit = 20 } = req.query
+    const result = await store.listInfluencers({ search, status, classification, minFollowers, hideAgencies, page, limit })
     res.json(result)
   } catch (err) {
     res.status(500).json({ error: err.message })

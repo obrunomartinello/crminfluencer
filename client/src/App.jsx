@@ -28,6 +28,8 @@ export default function App() {
     search: '',
     status: '',
     classification: '',
+    minFollowers: '',
+    hideAgencies: false,
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

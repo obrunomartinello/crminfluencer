@@ -269,8 +269,15 @@ export default function InfluencerTable({
 
                   {/* Audiência (Seguidores + Engajamento) */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {formatNum(inf.followers_count)}
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {formatNum(inf.followers_count)}
+                      </span>
+                      {inf.followers_count >= 15000 && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25" title="Lead com audiência qualificada (+15k)">
+                          15k+
+                        </span>
+                      )}
                     </div>
                     <div className="mt-0.5">
                       {getEngagementBadge(inf.engagement_rate)}

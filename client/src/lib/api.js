@@ -23,11 +23,13 @@ async function request(path, options = {}) {
 
 export const api = {
   // Lista com filtros e paginação
-  async getInfluencers({ search = '', status = '', classification = '', page = 1, limit = 20 } = {}) {
+  async getInfluencers({ search = '', status = '', classification = '', minFollowers = '', hideAgencies = false, page = 1, limit = 20 } = {}) {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (status) params.set('status', status)
     if (classification) params.set('classification', classification)
+    if (minFollowers) params.set('minFollowers', minFollowers)
+    if (hideAgencies) params.set('hideAgencies', 'true')
     if (page) params.set('page', page)
     if (limit) params.set('limit', limit)
 

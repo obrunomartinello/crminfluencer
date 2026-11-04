@@ -73,7 +73,7 @@ const store = {
     return { total, qualified, whatsapps, negotiating, closed }
   },
 
-  async listInfluencers({ search, status, classification, page = 1, limit = 20 }) {
+  async listInfluencers({ search, status, classification, minFollowers, hideAgencies, page = 1, limit = 20 }) {
     const pageNum = Math.max(1, parseInt(page) || 1)
     const limitNum = Math.max(1, parseInt(limit) || 20)
     const offset = (pageNum - 1) * limitNum
@@ -94,6 +94,12 @@ const store = {
         }
         if (classification) {
           query = query.eq('classification', classification)
+        }
+        if (minFollowers) {
+          query = query.gte('followers_count', parseInt(minFollowers))
+        }
+        if (hideAgencies === true || hideAgencies === 'true') {
+          query = query.eq('is_agency', false)
         }
 
         const { data, error, count } = await query
@@ -127,6 +133,15 @@ const store = {
 
     if (classification) {
       filtered = filtered.filter(i => i.classification === classification)
+    }
+
+    if (minFollowers) {
+      const min = parseInt(minFollowers)
+      filtered = filtered.filter(i => (i.followers_count || 0) >= min)
+    }
+
+    if (hideAgencies === true || hideAgencies === 'true') {
+      filtered = filtered.filter(i => !i.is_agency)
     }
 
     filtered.sort((a, b) => (b.score || 0) - (a.score || 0))

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, Sparkles, SlidersHorizontal, RotateCw, ChevronDown, UserPlus } from 'lucide-react'
+import { Search, Sparkles, RotateCw, ChevronDown, UserPlus, ShieldCheck, ShieldAlert, Users } from 'lucide-react'
 
 export default function FilterBar({
   filters,
@@ -36,9 +36,9 @@ export default function FilterBar({
       }}
     >
       {/* Search Input */}
-      <div className="relative flex-1 min-w-[240px]">
+      <div className="relative flex-1 min-w-[220px]">
         <Search
-          size={17}
+          size={16}
           className="absolute left-3.5 top-1/2 -translate-y-1/2"
           style={{ color: 'var(--text-muted)' }}
         />
@@ -56,7 +56,30 @@ export default function FilterBar({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Filtro de Porte de Seguidores (Mínimo 15k) */}
+        <div className="relative">
+          <select
+            value={filters.minFollowers || ''}
+            onChange={(e) => onFilterChange('minFollowers', e.target.value)}
+            className="appearance-none border text-xs font-medium pl-3 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer transition-colors"
+            style={{
+              backgroundColor: 'var(--input-bg)',
+              borderColor: filters.minFollowers ? '#3B82F6' : 'var(--border-color)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <option value="">Seguidores: Todos</option>
+            <option value="15000">🔥 15k+ (Ideal Pedro)</option>
+            <option value="30000">🚀 30k+</option>
+            <option value="50000">⭐ 50k+</option>
+            <option value="100000">👑 100k+</option>
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
+            <ChevronDown size={14} />
+          </div>
+        </div>
+
         {/* Status Dropdown */}
         <div className="relative">
           <select
@@ -105,6 +128,25 @@ export default function FilterBar({
           </div>
         </div>
 
+        {/* Toggle Anti-Agência */}
+        <button
+          type="button"
+          onClick={() => onFilterChange('hideAgencies', !filters.hideAgencies)}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+            filters.hideAgencies
+              ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
+              : 'hover:border-zinc-400 text-zinc-500'
+          }`}
+          style={{
+            backgroundColor: filters.hideAgencies ? undefined : 'var(--input-bg)',
+            borderColor: filters.hideAgencies ? undefined : 'var(--border-color)',
+          }}
+          title={filters.hideAgencies ? 'Mostrando apenas criadores diretos' : 'Clique para ocultar perfis com agência'}
+        >
+          <ShieldCheck size={14} className={filters.hideAgencies ? 'text-emerald-500' : 'text-zinc-400'} />
+          <span>{filters.hideAgencies ? 'Sem Agência' : 'Ocultar Agências'}</span>
+        </button>
+
         {/* Refresh button */}
         <button
           onClick={onRefresh}
@@ -126,7 +168,7 @@ export default function FilterBar({
           className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-xs px-3.5 py-2 rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
         >
           <Sparkles size={14} />
-          <span>Minerar Lookalikes</span>
+          <span>Minerar Instagram</span>
         </button>
 
         {/* Adicionar Criador Manual */}
