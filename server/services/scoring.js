@@ -399,4 +399,5 @@ module.exports = {
   buildStoryProjection,
   STORY_CLICK_VALUE_BRL,
   KEYWORDS,
+  UNDERAGE_TERMS: KEYWORDS.minorOrRisk,
 }

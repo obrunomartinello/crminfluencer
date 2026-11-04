@@ -1,6 +1,10 @@
 const axios = require('axios')
 const cheerio = require('cheerio')
-const { UNDERAGE_TERMS } = require('./scoring')
+const { KEYWORDS, UNDERAGE_TERMS: EXPORTED_UNDERAGE } = require('./scoring')
+const UNDERAGE_TERMS = EXPORTED_UNDERAGE || KEYWORDS?.minorOrRisk || [
+  '14y', '15y', '16y', '17y', 'roblox', 'free fire', 'freefire',
+  'brawl stars', 'minecraft', 'escola', 'enem', 'vestibulando', 'kids', 'infantil',
+]
 
 const COMPETITORS = [
   'blaze', 'betano', 'estrela bet', 'superbet', 'novibet', 'bet365',

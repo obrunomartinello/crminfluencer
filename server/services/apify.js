@@ -102,7 +102,7 @@ const { calculateTrimmedMedian } = require('./scoring')
 const supabase = require('../db/supabase')
 
 /**
- * Mapeia resultado completo do Apify instagram-profile-scraper
+ * Mapeia resultado completo do Apify (instagram-search-scraper ou instagram-profile-scraper)
  */
 function mapProfileResult(item) {
   const followersCount = item.followersCount || item.followers_count || 0
@@ -141,12 +141,14 @@ function mapProfileResult(item) {
   const bioLower = bio.toLowerCase()
 
   // Heurística de Agência no perfil
-  const isAgency = item.isBusinessAccount && (
+  const isAgency = (item.isBusinessAccount && (
     item.businessCategoryName?.toLowerCase().includes('agency') ||
     item.businessCategoryName?.toLowerCase().includes('advertising') ||
-    item.businessCategoryName?.toLowerCase().includes('marketing') ||
+    item.businessCategoryName?.toLowerCase().includes('marketing')
+  )) || (
     bioLower.includes('assessoria') ||
     bioLower.includes('agência') ||
+    bioLower.includes('agencia') ||
     bioLower.includes('casting') ||
     bioLower.includes('management')
   )
@@ -157,17 +159,31 @@ function mapProfileResult(item) {
   // Heurística de Achadinhos
   const promotesShopee = bioLower.includes('achadinho') || bioLower.includes('shopee') || bioLower.includes('amzn.to')
 
+  // Extração direta de WhatsApp de externalUrls (se presente na busca)
+  let directWhatsApp = item.whatsapp || null
+  if (!directWhatsApp && Array.isArray(item.externalUrls)) {
+    for (const link of item.externalUrls) {
+      if (link.link_type === 'whatsapp' || (link.url && link.url.includes('wa.me'))) {
+        const m = link.url.match(/(?:wa\.me\/|phone=|\+)(\d{10,14})/)
+        if (m) directWhatsApp = m[1]
+      }
+    }
+  }
+
+  const primaryExternalUrl = item.externalUrl || (Array.isArray(item.externalUrls) && item.externalUrls[0]?.url) || item.externalUrlShimmed || null
+
   return {
     username: item.username,
     full_name: item.fullName || item.full_name || item.username,
     profile_pic_url: item.profilePicUrlHD || item.profilePicUrl || item.profile_pic_url || null,
     bio: bio,
-    external_url: item.externalUrl || item.externalUrlShimmed || null,
+    external_url: primaryExternalUrl,
     followers_count: followersCount,
     following_count: item.followsCount || item.following_count || 0,
-    posts_count: item.postsCount || item.posts_count || 0,
+    posts_count: item.postsCount || (latestPosts ? latestPosts.length : 0),
     avg_reels_views: avgReelsViews,
     engagement_rate: engagementRate,
+    whatsapp: directWhatsApp,
     niche: item.businessCategoryName || 'Geral',
     is_agency: !!isAgency,
     promotes_raffle: !!promotesRaffle,
@@ -178,104 +194,101 @@ function mapProfileResult(item) {
 }
 
 /**
- * Executa mineração focada em PERFIS de criadores reais ("cara povão")
- * @param {string} query - Username semente (ex: @tirullipa) ou termo de busca
- * @param {number} count - Quantidade desejada
+ * Inicia execução assíncrona do Apify instagram-search-scraper (< 500ms)
+ * @param {string} query Palavra-chave (ex: 'nordeste influencer' ou 'sinuca brasil')
+ * @param {number} count Quantidade desejada (5 a 50)
  */
-async function runMiningActor(query, count = 25) {
+async function startAsyncSearch(query, count = 25) {
   if (!process.env.APIFY_TOKEN) {
-    console.warn('[apify] APIFY_TOKEN não configurado — retornando mock data')
-    return MOCK_INFLUENCERS.slice(0, count)
+    console.warn('[apify] APIFY_TOKEN não configurado — simulando execução com mock data')
+    return {
+      runId: 'mock-run-' + Date.now(),
+      defaultDatasetId: 'mock-dataset',
+      status: 'SUCCEEDED',
+      isMock: true,
+      items: MOCK_INFLUENCERS.slice(0, count),
+    }
   }
 
   const { ApifyClient } = require('apify-client')
   const client = new ApifyClient({ token: process.env.APIFY_TOKEN })
   const cleanQuery = query.replace(/^[@#]/, '').trim()
 
-  console.log(`[apify] Iniciando mineração de PERFIS para: "${cleanQuery}", limite: ${count}`)
+  console.log(`[apify] Disparando busca assíncrona por palavra-chave: "${cleanQuery}" (limite: ${count})`)
 
+  const run = await client.actor('apify/instagram-search-scraper').start({
+    search: cleanQuery,
+    searchType: 'user',
+    resultsLimit: Math.min(Math.max(count, 5), 50),
+  })
+
+  return {
+    runId: run.id,
+    defaultDatasetId: run.defaultDatasetId,
+    status: run.status,
+    isMock: false,
+  }
+}
+
+/**
+ * Checa status de uma execução de ator no Apify e extrai dados se concluído
+ * @param {string} runId ID da execução
+ * @param {string} defaultDatasetId ID do dataset padrão
+ */
+async function checkActorRun(runId, defaultDatasetId) {
+  if (!process.env.APIFY_TOKEN || runId.startsWith('mock-run-')) {
+    return { status: 'SUCCEEDED', items: MOCK_INFLUENCERS }
+  }
+
+  const { ApifyClient } = require('apify-client')
+  const client = new ApifyClient({ token: process.env.APIFY_TOKEN })
+
+  const run = await client.run(runId).get()
+  if (!run) {
+    throw new Error(`Execução Apify ID "${runId}" não encontrada`)
+  }
+
+  if (run.status === 'SUCCEEDED') {
+    const datasetId = defaultDatasetId || run.defaultDatasetId
+    const dataset = await client.dataset(datasetId).listItems()
+    const profiles = dataset.items.map(mapProfileResult).filter(p => p.username)
+    return { status: 'SUCCEEDED', items: profiles }
+  }
+
+  if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(run.status)) {
+    return { status: 'FAILED', error: `Scraper finalizado com status de erro: ${run.status}`, items: [] }
+  }
+
+  return { status: 'RUNNING', items: [] }
+}
+
+/**
+ * Fallback síncrono mantido para compatibilidade
+ */
+async function runMiningActor(query, count = 25) {
   try {
-    // 1. Minerar o perfil semente via instagram-profile-scraper
-    const run = await client.actor('apify/instagram-profile-scraper').call({
-      usernames: [cleanQuery],
-    }, { waitSecs: 45 })
+    const startResult = await startAsyncSearch(query, count)
+    if (startResult.isMock) return startResult.items
 
-    const dataset = await client.dataset(run.defaultDatasetId).listItems()
-    let profiles = dataset.items.map(mapProfileResult).filter(p => p.username)
-
-    // Se o perfil semente tiver contas sugeridas e o usuário pediu mais perfis:
-    if (profiles.length > 0 && profiles[0].related_profiles && profiles[0].related_profiles.length > 0 && count > 1) {
-      let suggestedUsernames = profiles[0].related_profiles
-        .map(r => r.username)
-        .filter(Boolean)
-        .slice(0, count - 1)
-
-      console.log(`[apify] Encontradas ${suggestedUsernames.length} Contas Sugeridas pelo Instagram:`, suggestedUsernames)
-
-      // DEDUPLICAÇÃO DE LOOKALIKES NO BANCO:
-      // Evita gastar créditos da Apify raspando perfis que já existem no Supabase
-      if (supabase && suggestedUsernames.length > 0) {
-        try {
-          const { data: existing } = await supabase
-            .from('influencers')
-            .select('username')
-            .in('username', suggestedUsernames)
-
-          if (existing && existing.length > 0) {
-            const existingSet = new Set(existing.map(e => e.username.toLowerCase()))
-            const beforeCount = suggestedUsernames.length
-            suggestedUsernames = suggestedUsernames.filter(u => !existingSet.has(u.toLowerCase()))
-            console.log(`[apify] 💰 Economia de Créditos: ${beforeCount - suggestedUsernames.length} perfis sugeridos já constam no banco e foram ignorados.`)
-          }
-        } catch (_dupErr) {
-          // ignora erro de checagem
-        }
-      }
-
-      if (suggestedUsernames.length > 0) {
-        try {
-          const runSuggested = await client.actor('apify/instagram-profile-scraper').call({
-            usernames: suggestedUsernames,
-          }, { waitSecs: 60 })
-
-          const suggestedDataset = await client.dataset(runSuggested.defaultDatasetId).listItems()
-          const suggestedProfiles = suggestedDataset.items.map(mapProfileResult).filter(p => p.username)
-          profiles = [...profiles, ...suggestedProfiles]
-        } catch (sugErr) {
-          console.warn('[apify] Aviso ao buscar perfis sugeridos:', sugErr.message)
-        }
-      }
+    // Polling síncrono rápido (máx 12s para segurança)
+    const startTime = Date.now()
+    while (Date.now() - startTime < 12000) {
+      await new Promise(r => setTimeout(r, 2000))
+      const check = await checkActorRun(startResult.runId, startResult.defaultDatasetId)
+      if (check.status === 'SUCCEEDED') return check.items
+      if (check.status === 'FAILED') break
     }
-
-
-    // Se o profile scraper não achou ou a query não era um username direto, fallback para hashtag
-    if (profiles.length === 0) {
-      console.log(`[apify] Buscando criadores que postaram na hashtag #${cleanQuery}...`)
-      const hashRun = await client.actor('apify/instagram-hashtag-scraper').call({
-        hashtags: [cleanQuery],
-        resultsLimit: Math.min(count, 15),
-      }, { waitSecs: 45 })
-
-      const hashDataset = await client.dataset(hashRun.defaultDatasetId).listItems()
-      const ownerUsernames = [...new Set(hashDataset.items.map(i => i.ownerUsername).filter(Boolean))].slice(0, count)
-
-      if (ownerUsernames.length > 0) {
-        console.log(`[apify] Extraindo perfis reais de ${ownerUsernames.length} criadores da hashtag...`)
-        const profRun = await client.actor('apify/instagram-profile-scraper').call({
-          usernames: ownerUsernames,
-        }, { waitSecs: 60 })
-
-        const profDataset = await client.dataset(profRun.defaultDatasetId).listItems()
-        profiles = profDataset.items.map(mapProfileResult).filter(p => p.username)
-      }
-    }
-
-    return profiles.slice(0, count)
+    return MOCK_INFLUENCERS.slice(0, count)
   } catch (err) {
-    console.error('❌ [apify] Erro na execução do scraper:', err.message)
-    // Retornar mock data de segurança caso a cota do Apify atinja limite
+    console.error('❌ [apify] Erro no fallback de mineração:', err.message)
     return MOCK_INFLUENCERS.slice(0, count)
   }
 }
 
-module.exports = { runMiningActor, MOCK_INFLUENCERS }
+module.exports = {
+  startAsyncSearch,
+  checkActorRun,
+  mapProfileResult,
+  runMiningActor,
+  MOCK_INFLUENCERS,
+}
