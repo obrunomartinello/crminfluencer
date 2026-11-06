@@ -64,6 +64,19 @@ router.put('/:id', async (req, res) => {
   }
 })
 
+// GET /api/influencers/profile/:username — Perfil unificado com histórico de captação, publicidades e metas
+router.get('/profile/:username', async (req, res) => {
+  try {
+    const fullProfile = await store.getInfluencerFullProfile(req.params.username)
+    if (!fullProfile) {
+      return res.status(404).json({ error: 'Influenciador não encontrado' })
+    }
+    res.json(fullProfile)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // DELETE /api/influencers/:id
 router.delete('/:id', async (req, res) => {
   try {
