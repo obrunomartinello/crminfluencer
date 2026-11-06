@@ -253,6 +253,9 @@ function buildInitialDatabase() {
       followers_count: 25000,
       classification: c.status === 'Fechou' ? 'OURO' : 'PRATA',
       score: c.status === 'Fechou' ? 95 : 65,
+      is_agency: false,
+      promotes_raffle: false,
+      promotes_shopee: false,
     })
   }
 
@@ -282,6 +285,9 @@ function buildInitialDatabase() {
         followers_count: 35000,
         classification: 'OURO',
         score: 90,
+        is_agency: false,
+        promotes_raffle: false,
+        promotes_shopee: false,
       })
     }
 

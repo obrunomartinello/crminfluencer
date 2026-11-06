@@ -1,5 +1,5 @@
 /**
- * API client para o backend Express do Scout CRM
+ * API client para o backend Express do Scout CRM v2.0
  */
 
 const BASE_URL = '/api'
@@ -22,7 +22,12 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  // Lista com filtros e paginação
+  // Jogos da operação
+  async getGames() {
+    return request('/games')
+  },
+
+  // --- CAPTAÇÃO ---
   async getInfluencers({ search = '', status = '', classification = '', minFollowers = '', hideAgencies = false, page = 1, limit = 20 } = {}) {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
@@ -36,12 +41,10 @@ export const api = {
     return request(`/influencers?${params.toString()}`)
   },
 
-  // Métricas do Dashboard (KPIs)
   async getStats() {
     return request('/influencers/stats')
   },
 
-  // Cadastro manual de influenciador
   async createInfluencer(data) {
     return request('/influencers', {
       method: 'POST',
@@ -49,7 +52,6 @@ export const api = {
     })
   },
 
-  // Atualização (status, notas, etc.)
   async updateInfluencer(id, data) {
     return request(`/influencers/${id}`, {
       method: 'PUT',
@@ -57,14 +59,106 @@ export const api = {
     })
   },
 
-  // Deletar
   async deleteInfluencer(id) {
     return request(`/influencers/${id}`, {
       method: 'DELETE',
     })
   },
 
-  // Iniciar varredura assíncrona (Search Scraper por Palavra-Chave)
+  async getInfluencerFullProfile(username) {
+    return request(`/influencers/profile/${username}`)
+  },
+
+  // --- PUBLICIDADES (CONTROLE FINANCEIRO) ---
+  async getPublicidades({ influencer = '', game = '', closureType = '', deliveryStatus = '', paymentStatus = '', page = 1, limit = 50 } = {}) {
+    const params = new URLSearchParams()
+    if (influencer) params.set('influencer', influencer)
+    if (game) params.set('game', game)
+    if (closureType) params.set('closureType', closureType)
+    if (deliveryStatus) params.set('deliveryStatus', deliveryStatus)
+    if (paymentStatus) params.set('paymentStatus', paymentStatus)
+    if (page) params.set('page', page)
+    if (limit) params.set('limit', limit)
+
+    return request(`/publicidades?${params.toString()}`)
+  },
+
+  async getPublicidadesStats() {
+    return request('/publicidades/stats')
+  },
+
+  async createPublicidade(data) {
+    return request('/publicidades', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async updatePublicidade(id, data) {
+    return request(`/publicidades/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async deletePublicidade(id) {
+    return request(`/publicidades/${id}`, {
+      method: 'DELETE',
+    })
+  },
+
+  // --- METAS DE DEPOSITANTES ---
+  async getMetas() {
+    return request('/metas')
+  },
+
+  async getMetasStats() {
+    return request('/metas/stats')
+  },
+
+  async createMeta(data) {
+    return request('/metas', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async updateMeta(id, data) {
+    return request(`/metas/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async incrementMeta(id, amount = 1) {
+    return request(`/metas/${id}/increment`, {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    })
+  },
+
+  // --- IMPORTAÇÃO & RESET PEDRO ---
+  async resetPedroData() {
+    return request('/import/reset-pedro', {
+      method: 'POST',
+    })
+  },
+
+  async previewImport(type, rows) {
+    return request('/import/preview', {
+      method: 'POST',
+      body: JSON.stringify({ type, rows }),
+    })
+  },
+
+  async executeImport(type, items) {
+    return request('/import/execute', {
+      method: 'POST',
+      body: JSON.stringify({ type, items }),
+    })
+  },
+
+  // --- MINERAÇÃO ASSÍNCRONA ---
   async startMine(query, count = 25) {
     return request('/mine/start', {
       method: 'POST',
@@ -72,12 +166,10 @@ export const api = {
     })
   },
 
-  // Consultar status da varredura
   async getMineStatus(jobId) {
     return request(`/mine/status/${jobId}`)
   },
 
-  // Disparar mineração com Apify (Legado/Síncrono)
   async mine(query, count = 25) {
     return request('/mine', {
       method: 'POST',
@@ -85,7 +177,6 @@ export const api = {
     })
   },
 
-  // Inspecionar link na bio
   async inspectLink(url) {
     return request('/inspect-link', {
       method: 'POST',
