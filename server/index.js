@@ -21,9 +21,15 @@ app.get('/api/games', (req, res) => {
   res.json({ games: store.listGames() })
 })
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, timestamp: new Date().toISOString() })
+// Health check + Keepalive do Supabase
+app.get('/api/health', async (req, res) => {
+  const store = require('./db/store')
+  const supabase = await store.checkSupabaseHealth()
+  res.json({
+    ok: true,
+    timestamp: new Date().toISOString(),
+    supabase,
+  })
 })
 
 const PORT = process.env.PORT || 3001

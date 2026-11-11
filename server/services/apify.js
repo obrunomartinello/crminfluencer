@@ -99,19 +99,131 @@ const MOCK_INFLUENCERS = [
 ]
 
 const { calculateTrimmedMedian } = require('./scoring')
-const supabase = require('../db/supabase')
+
+function normalizeHandle(raw) {
+  return String(raw || '').trim().toLowerCase().replace(/^@+/, '')
+}
 
 /**
- * Mapeia resultado completo do Apify (instagram-search-scraper ou instagram-profile-scraper)
+ * Monta input compatível com o schema oficial do apify/instagram-search-scraper
+ * (usa `searchLimit`, não `resultsLimit`; `liveSearch: true` para busca real de usuários).
  */
-function mapProfileResult(item) {
+function buildSearchInput(query, count = 25, mode = 'popular') {
+  const cleanQuery = String(query || '').replace(/^[@#]+/, '').trim()
+  const limit = Math.min(Math.max(parseInt(count) || 25, 5), 50)
+
+  if (mode === 'user') {
+    return {
+      search: cleanQuery,
+      searchType: 'user',
+      searchLimit: limit,
+      liveSearch: true,
+    }
+  }
+
+  // Modo padrão: Reels/Conteúdos Populares do nicho — encontra criadores autênticos ativos
+  return {
+    search: cleanQuery,
+    searchType: 'popular',
+    searchLimit: limit,
+  }
+}
+
+/**
+ * Extrai e deduplica criadores a partir dos itens brutos da Fase 1 (popular Reels ou liveSearch user).
+ * Prioriza criadores que ainda não estão no CRM (`excludeSet`).
+ */
+function extractCreatorsFromSearchItems(items = [], mode = 'popular', excludeSet = new Set()) {
+  const metaByUsername = {}
+
+  const ensureEntry = (username, seed = {}) => {
+    if (!username) return null
+    if (!metaByUsername[username]) {
+      metaByUsername[username] = {
+        username,
+        fullName: seed.fullName || '',
+        profilePicUrl: seed.profilePicUrl || null,
+        reelViews: [],
+        likes: [],
+        comments: [],
+        captions: [],
+        rawProfile: null,
+      }
+    }
+    const entry = metaByUsername[username]
+    if (!entry.fullName && seed.fullName) entry.fullName = seed.fullName
+    if (!entry.profilePicUrl && seed.profilePicUrl) entry.profilePicUrl = seed.profilePicUrl
+    return entry
+  }
+
+  for (const item of items) {
+    if (!item || item.error) continue
+
+    // Item de Reel/Post (searchType: 'popular')
+    if (item.ownerUsername || item.videoPlayCount !== undefined || item.productType === 'clips') {
+      const owner = normalizeHandle(item.ownerUsername || item.username)
+      const entry = ensureEntry(owner, {
+        fullName: item.ownerFullName || item.fullName,
+        profilePicUrl: item.profilePicUrl || item.displayUrl,
+      })
+
+      if (entry) {
+        const views = item.videoPlayCount || item.videoViewCount || (item.likesCount ? item.likesCount * 8 : 0)
+        if (views > 0) entry.reelViews.push(views)
+        if (item.likesCount) entry.likes.push(item.likesCount)
+        if (item.commentsCount) entry.comments.push(item.commentsCount)
+        if (item.caption) entry.captions.push(item.caption)
+      }
+
+      // Coautores do Reel (collabs reais no mesmo nicho)
+      if (Array.isArray(item.coauthorProducers)) {
+        for (const coauthor of item.coauthorProducers) {
+          const coUser = normalizeHandle(coauthor.username)
+          if (coUser && coUser !== owner) {
+            ensureEntry(coUser, {
+              fullName: coauthor.full_name || coauthor.fullName,
+              profilePicUrl: coauthor.profile_pic_url || coauthor.profilePicUrl,
+            })
+          }
+        }
+      }
+      continue
+    }
+
+    // Item de Usuário (searchType: 'user' com liveSearch ou profile)
+    const user = normalizeHandle(item.username)
+    if (user) {
+      const entry = ensureEntry(user, {
+        fullName: item.fullName || item.full_name,
+        profilePicUrl: item.profilePicUrlHD || item.profilePicUrl || item.profile_pic_url,
+      })
+      if (entry && (item.followersCount !== undefined || item.biography)) {
+        entry.rawProfile = item
+      }
+    }
+  }
+
+  const allUsernames = Object.keys(metaByUsername)
+  const freshUsernames = allUsernames.filter(u => !excludeSet.has(u))
+
+  return {
+    allUsernames,
+    freshUsernames,
+    metaByUsername,
+  }
+}
+
+/**
+ * Mapeia resultado completo do Apify (instagram-profile-scraper ou fallback de search-scraper)
+ */
+function mapProfileResult(item, stage1Meta = null) {
+  const username = normalizeHandle(item.username || item.ownerUsername || stage1Meta?.username)
   const followersCount = item.followersCount || item.followers_count || 0
   const latestPosts = item.latestPosts || item.latestIgtvVideos || []
-  
-  // 1. Extrair visualizações e métricas de engajamento dos últimos posts/Reels
-  const viewsList = []
-  let totalLikes = 0
-  let totalComments = 0
+
+  const viewsList = [...(stage1Meta?.reelViews || [])]
+  let totalLikes = (stage1Meta?.likes || []).reduce((acc, v) => acc + v, 0)
+  let totalComments = (stage1Meta?.comments || []).reduce((acc, v) => acc + v, 0)
 
   for (const post of latestPosts.slice(0, 10)) {
     const views = post.videoViewCount || post.videoPlayCount || (post.likesCount ? post.likesCount * 8 : 0)
@@ -122,25 +234,27 @@ function mapProfileResult(item) {
     if (post.commentsCount) totalComments += post.commentsCount
   }
 
-  // Mediana Recortada (Trimmed Median) para evitar distorção de 1 Reels que viralizou no Explorar
-  const avgReelsViews = viewsList.length > 0 
-    ? calculateTrimmedMedian(viewsList) 
+  // Se o próprio item for um Reel avulso sem latestPosts
+  if (viewsList.length === 0 && (item.videoPlayCount || item.videoViewCount)) {
+    viewsList.push(item.videoPlayCount || item.videoViewCount)
+  }
+
+  const avgReelsViews = viewsList.length > 0
+    ? calculateTrimmedMedian(viewsList)
     : (item.avgReelsViews || 0)
 
   const engagementRate = followersCount > 0
     ? Math.round((avgReelsViews / followersCount) * 10000) / 100
     : 0
 
-  // 2. Detecção de "Índice de Vaidade / Compra de Curtidas":
-  // Se tem muitas curtidas mas a razão Comentários / Curtidas < 0.4% (padrão de robôs/engajamento comprado)
-  const suspiciousEngagement = totalLikes > 500 && totalComments > 0 
+  const suspiciousEngagement = totalLikes > 500 && totalComments > 0
     ? (totalComments / totalLikes) < 0.004
     : false
 
-  const bio = item.biography || item.bio || ''
+  const sampleCaption = stage1Meta?.captions?.[0] || item.caption || ''
+  const bio = item.biography || item.bio || (sampleCaption ? `[Reel] ${sampleCaption.slice(0, 160)}` : '')
   const bioLower = bio.toLowerCase()
 
-  // Heurística de Agência no perfil
   const isAgency = (item.isBusinessAccount && (
     item.businessCategoryName?.toLowerCase().includes('agency') ||
     item.businessCategoryName?.toLowerCase().includes('advertising') ||
@@ -153,13 +267,9 @@ function mapProfileResult(item) {
     bioLower.includes('management')
   )
 
-  // Heurística de Rifa
   const promotesRaffle = bioLower.includes('rifa') || bioLower.includes('sorteio') || bioLower.includes('cota')
-
-  // Heurística de Achadinhos
   const promotesShopee = bioLower.includes('achadinho') || bioLower.includes('shopee') || bioLower.includes('amzn.to')
 
-  // Extração direta de WhatsApp de externalUrls (se presente na busca)
   let directWhatsApp = item.whatsapp || null
   if (!directWhatsApp && Array.isArray(item.externalUrls)) {
     for (const link of item.externalUrls) {
@@ -170,13 +280,20 @@ function mapProfileResult(item) {
     }
   }
 
-  const primaryExternalUrl = item.externalUrl || (Array.isArray(item.externalUrls) && item.externalUrls[0]?.url) || item.externalUrlShimmed || null
+  const primaryExternalUrl = item.externalUrl
+    || (Array.isArray(item.externalUrls) && item.externalUrls[0]?.url)
+    || item.externalUrlShimmed
+    || null
+
+  const category = item.businessCategoryName && item.businessCategoryName !== 'None'
+    ? item.businessCategoryName
+    : 'Criador'
 
   return {
-    username: item.username,
-    full_name: item.fullName || item.full_name || item.username,
-    profile_pic_url: item.profilePicUrlHD || item.profilePicUrl || item.profile_pic_url || null,
-    bio: bio,
+    username,
+    full_name: item.fullName || item.ownerFullName || item.full_name || stage1Meta?.fullName || username,
+    profile_pic_url: item.profilePicUrlHD || item.profilePicUrl || item.profile_pic_url || stage1Meta?.profilePicUrl || null,
+    bio,
     external_url: primaryExternalUrl,
     followers_count: followersCount,
     following_count: item.followsCount || item.following_count || 0,
@@ -184,7 +301,7 @@ function mapProfileResult(item) {
     avg_reels_views: avgReelsViews,
     engagement_rate: engagementRate,
     whatsapp: directWhatsApp,
-    niche: item.businessCategoryName || 'Geral',
+    niche: category,
     is_agency: !!isAgency,
     promotes_raffle: !!promotesRaffle,
     promotes_shopee: !!promotesShopee,
@@ -194,16 +311,16 @@ function mapProfileResult(item) {
 }
 
 /**
- * Inicia execução assíncrona do Apify instagram-search-scraper (< 500ms)
- * @param {string} query Palavra-chave (ex: 'nordeste influencer' ou 'sinuca brasil')
- * @param {number} count Quantidade desejada (5 a 50)
+ * Fase 1: Inicia busca assíncrona no Apify (< 800ms)
+ * Modos suportados: 'popular' (Reels em alta - padrão), 'user' (Live Search perfis), 'hybrid' (ambos em paralelo)
  */
-async function startAsyncSearch(query, count = 25) {
+async function startAsyncSearch(query, count = 25, options = {}) {
   if (!process.env.APIFY_TOKEN) {
     console.warn('[apify] APIFY_TOKEN não configurado — simulando execução com mock data')
     return {
       runId: 'mock-run-' + Date.now(),
       defaultDatasetId: 'mock-dataset',
+      runs: [],
       status: 'SUCCEEDED',
       isMock: true,
       items: MOCK_INFLUENCERS.slice(0, count),
@@ -212,31 +329,117 @@ async function startAsyncSearch(query, count = 25) {
 
   const { ApifyClient } = require('apify-client')
   const client = new ApifyClient({ token: process.env.APIFY_TOKEN })
-  const cleanQuery = query.replace(/^[@#]/, '').trim()
+  const mode = options.mode || 'popular'
+  const limit = Math.min(Math.max(parseInt(count) || 25, 5), 50)
 
-  console.log(`[apify] Disparando busca assíncrona por palavra-chave: "${cleanQuery}" (limite: ${count})`)
+  console.log(`[apify] Fase 1 (${mode}) para "${query}" (searchLimit: ${limit})`)
 
-  const run = await client.actor('apify/instagram-search-scraper').start({
-    search: cleanQuery,
-    searchType: 'user',
-    resultsLimit: Math.min(Math.max(count, 5), 50),
-  })
+  if (mode === 'hybrid') {
+    const [popularRun, userRun] = await Promise.all([
+      client.actor('apify/instagram-search-scraper').start(buildSearchInput(query, limit, 'popular')),
+      client.actor('apify/instagram-search-scraper').start(buildSearchInput(query, Math.min(limit, 20), 'user')),
+    ])
+    return {
+      runId: popularRun.id,
+      defaultDatasetId: popularRun.defaultDatasetId,
+      runs: [
+        { id: popularRun.id, ds: popularRun.defaultDatasetId, mode: 'popular' },
+        { id: userRun.id, ds: userRun.defaultDatasetId, mode: 'user' },
+      ],
+      status: 'RUNNING',
+      isMock: false,
+    }
+  }
 
+  const run = await client.actor('apify/instagram-search-scraper').start(buildSearchInput(query, limit, mode))
   return {
     runId: run.id,
     defaultDatasetId: run.defaultDatasetId,
+    runs: [{ id: run.id, ds: run.defaultDatasetId, mode }],
     status: run.status,
     isMock: false,
   }
 }
 
 /**
- * Checa status de uma execução de ator no Apify e extrai dados se concluído
- * @param {string} runId ID da execução
- * @param {string} defaultDatasetId ID do dataset padrão
+ * Fase 2: Inicia enriquecimento completo de perfis descobertos (seguidores, bio, externalUrl, últimos posts)
  */
-async function checkActorRun(runId, defaultDatasetId) {
-  if (!process.env.APIFY_TOKEN || runId.startsWith('mock-run-')) {
+async function startProfileEnrichment(usernames = []) {
+  const cleanUsernames = [...new Set(usernames.map(normalizeHandle).filter(Boolean))].slice(0, 25)
+  if (cleanUsernames.length === 0) {
+    return null
+  }
+
+  const { ApifyClient } = require('apify-client')
+  const client = new ApifyClient({ token: process.env.APIFY_TOKEN })
+
+  console.log(`[apify] Fase 2 enriquecendo ${cleanUsernames.length} perfis via instagram-profile-scraper`)
+
+  const run = await client.actor('apify/instagram-profile-scraper').start({
+    usernames: cleanUsernames,
+    includeAboutSection: false,
+  })
+
+  return {
+    id: run.id,
+    ds: run.defaultDatasetId,
+    status: run.status,
+  }
+}
+
+/**
+ * Checa 1 ou mais runs paralelos da Fase 1 no Apify
+ */
+async function checkRunsStatus(runs = []) {
+  if (!process.env.APIFY_TOKEN) {
+    return { status: 'SUCCEEDED', items: MOCK_INFLUENCERS }
+  }
+
+  const { ApifyClient } = require('apify-client')
+  const client = new ApifyClient({ token: process.env.APIFY_TOKEN })
+
+  const runInfos = await Promise.all(runs.map(r => client.run(r.id).get()))
+
+  const anyRunning = runInfos.some(info => info && ['READY', 'RUNNING'].includes(info.status))
+  if (anyRunning) {
+    return { status: 'RUNNING', items: [] }
+  }
+
+  const succeededRuns = []
+  for (let i = 0; i < runInfos.length; i++) {
+    const info = runInfos[i]
+    if (info && info.status === 'SUCCEEDED') {
+      succeededRuns.push({
+        ds: runs[i].ds || info.defaultDatasetId,
+        mode: runs[i].mode || 'popular',
+      })
+    }
+  }
+
+  if (succeededRuns.length === 0) {
+    const statuses = runInfos.map(r => r?.status || 'UNKNOWN').join(', ')
+    return { status: 'FAILED', error: `Scraper finalizado com erro: ${statuses}`, items: [] }
+  }
+
+  const datasets = await Promise.all(
+    succeededRuns.map(r => client.dataset(r.ds).listItems())
+  )
+
+  const combinedItems = []
+  for (let i = 0; i < datasets.length; i++) {
+    for (const item of datasets[i].items || []) {
+      combinedItems.push({ ...item, __searchMode: succeededRuns[i].mode })
+    }
+  }
+
+  return { status: 'SUCCEEDED', items: combinedItems }
+}
+
+/**
+ * Checa status de um run único (compatibilidade e Fase 2)
+ */
+async function checkActorRun(runId, defaultDatasetId, metaByUsername = {}) {
+  if (!process.env.APIFY_TOKEN || String(runId).startsWith('mock-run-')) {
     return { status: 'SUCCEEDED', items: MOCK_INFLUENCERS }
   }
 
@@ -251,7 +454,12 @@ async function checkActorRun(runId, defaultDatasetId) {
   if (run.status === 'SUCCEEDED') {
     const datasetId = defaultDatasetId || run.defaultDatasetId
     const dataset = await client.dataset(datasetId).listItems()
-    const profiles = dataset.items.map(mapProfileResult).filter(p => p.username)
+    const profiles = dataset.items
+      .map(item => {
+        const u = normalizeHandle(item.username || item.ownerUsername)
+        return mapProfileResult(item, metaByUsername[u] || null)
+      })
+      .filter(p => p.username)
     return { status: 'SUCCEEDED', items: profiles }
   }
 
@@ -267,10 +475,9 @@ async function checkActorRun(runId, defaultDatasetId) {
  */
 async function runMiningActor(query, count = 25) {
   try {
-    const startResult = await startAsyncSearch(query, count)
+    const startResult = await startAsyncSearch(query, count, { mode: 'popular' })
     if (startResult.isMock) return startResult.items
 
-    // Polling síncrono rápido (máx 12s para segurança)
     const startTime = Date.now()
     while (Date.now() - startTime < 12000) {
       await new Promise(r => setTimeout(r, 2000))
@@ -286,7 +493,11 @@ async function runMiningActor(query, count = 25) {
 }
 
 module.exports = {
+  buildSearchInput,
+  extractCreatorsFromSearchItems,
   startAsyncSearch,
+  startProfileEnrichment,
+  checkRunsStatus,
   checkActorRun,
   mapProfileResult,
   runMiningActor,

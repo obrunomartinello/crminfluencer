@@ -251,9 +251,12 @@ function calculateInfluencerScore(profile, linktreeData = {}) {
     positives.push(`Médio Porte (${(followers / 1000).toFixed(1)}k) — exige negociação firme`)
   } else if (followers >= 5000 && followers < 10000) {
     score += 0
-  } else {
+  } else if (followers >= 2000 && followers < 5000) {
     score -= 20
-    redFlags.push(`Fora da faixa de escala (${(followers / 1000).toFixed(1)}k seguidores)`)
+    redFlags.push(`Abaixo de 5k seguidores (${(followers / 1000).toFixed(1)}k seguidores)`)
+  } else {
+    score -= 35
+    redFlags.push(`Microperfil fora da escala (${followers} seguidores)`)
   }
 
   // 4. DETECTOR DE ROSTO/VOZ + ROTINA ("Bom dia ao Boa noite" & Caixinha)
@@ -306,7 +309,7 @@ function calculateInfluencerScore(profile, linktreeData = {}) {
       `Alerta One-Hit Wonder: Pico de ${(engagement.maxViews / 1000).toFixed(1)}k views, mas mediana real é só ${engagement.medianViews} views (Assimetria ${engagement.asymmetryRatio}x)`
     )
     tags.push('VIRAL_ISOLADO')
-  } else if (engagement.medianViews >= followers * 0.15) {
+  } else if (followers >= 5000 && engagement.medianViews >= followers * 0.15) {
     score += 15
     positives.push(
       `Comunidade Fiel: Mediana sólida de ${(engagement.medianViews / 1000).toFixed(1)}k views/Reels (${Math.round((engagement.medianViews / followers) * 100)}% da base)`

@@ -2,7 +2,21 @@ const express = require('express')
 const router = express.Router()
 const store = require('../db/store')
 
-const VALID_STATUSES = ['Novo', 'Qualificado', 'Abordado', 'Negociando', 'Fechado', 'Desqualificado']
+const VALID_STATUSES = [
+  'Novo',
+  'Sem resposta',
+  'Em negociação',
+  'Fechou',
+  'Não interessado',
+  'Recusado - métricas ruins',
+  'Recusado - Remarketing',
+  'Outro momento',
+  'Qualificado',
+  'Abordado',
+  'Negociando',
+  'Fechado',
+  'Desqualificado',
+]
 const VALID_CLASSIFICATIONS = ['OURO', 'PRATA', 'BRONZE', 'LIXO']
 
 // GET /api/influencers/stats — DEVE vir antes de /:id
@@ -15,12 +29,46 @@ router.get('/stats', async (req, res) => {
   }
 })
 
-// GET /api/influencers — com filtros e paginação
+// GET /api/influencers — com filtros, ordenação e paginação
 router.get('/', async (req, res) => {
   try {
-    const { search, status, classification, minFollowers, hideAgencies, page = 1, limit = 20 } = req.query
-    const result = await store.listInfluencers({ search, status, classification, minFollowers, hideAgencies, page, limit })
+    const {
+      search,
+      status,
+      classification,
+      minFollowers,
+      hideAgencies,
+      onlyMined,
+      sortBy = 'recent',
+      page = 1,
+      limit = 20,
+    } = req.query
+    const result = await store.listInfluencers({
+      search,
+      status,
+      classification,
+      minFollowers,
+      hideAgencies,
+      onlyMined,
+      sortBy,
+      page,
+      limit,
+    })
     res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/influencers/batch-sync — sincroniza lote em memória caso serverless recicle
+router.post('/batch-sync', async (req, res) => {
+  try {
+    const { items } = req.body
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'items deve ser um array' })
+    }
+    const result = await store.batchUpsertInfluencers(items)
+    res.json({ success: true, ...result })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

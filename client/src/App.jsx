@@ -49,7 +49,10 @@ export default function App() {
     classification: '',
     minFollowers: '',
     hideAgencies: false,
+    onlyMined: false,
+    sortBy: 'recent',
   })
+  const [dbStatus, setDbStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -108,10 +111,29 @@ export default function App() {
     }
   }, [page, filters])
 
-  // Efeito inicial
+  // Efeito inicial: hidrata cache de minerados caso Vercel/Memória reinicie e verifica Supabase
   useEffect(() => {
-    fetchStats()
-    fetchInfluencers(1, filters)
+    const boot = async () => {
+      try {
+        const rawCache = localStorage.getItem('scout_mined_cache_v2')
+        if (rawCache) {
+          const parsed = JSON.parse(rawCache)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            await api.batchSyncInfluencers(parsed).catch(() => {})
+          }
+        }
+      } catch {
+        // Ignora erro de localStorage
+      }
+
+      api.getHealth()
+        .then((h) => setDbStatus(h?.supabase || null))
+        .catch(() => {})
+
+      fetchStats()
+      fetchInfluencers(1, filters)
+    }
+    boot()
   }, [])
 
   // Atualização de filtro
@@ -315,6 +337,24 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          {dbStatus && (
+            <span
+              title={
+                dbStatus.online
+                  ? 'Supabase conectado e ativo'
+                  : 'Supabase em pausa/offline — leads minerados protegidos no cache local e memória'
+              }
+              className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border ${
+                dbStatus.online
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.online ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              <span>{dbStatus.online ? 'DB Online' : 'Modo Local/Cache'}</span>
+            </span>
+          )}
+
           {/* Theme Toggle (Dark / Light) */}
           <button
             onClick={toggleTheme}
@@ -495,9 +535,34 @@ export default function App() {
       <MineModal
         open={mineModalOpen}
         onClose={() => setMineModalOpen(false)}
-        onComplete={() => {
+        onComplete={async (newItems = []) => {
+          if (Array.isArray(newItems) && newItems.length > 0) {
+            try {
+              const existingRaw = localStorage.getItem('scout_mined_cache_v2')
+              const existing = existingRaw ? JSON.parse(existingRaw) : []
+              const mergedMap = new Map()
+              for (const item of [...newItems, ...existing]) {
+                if (item?.username) mergedMap.set(item.username.toLowerCase(), item)
+              }
+              const merged = Array.from(mergedMap.values()).slice(0, 200)
+              localStorage.setItem('scout_mined_cache_v2', JSON.stringify(merged))
+            } catch {
+              // Ignora se storage cheio
+            }
+            await api.batchSyncInfluencers(newItems).catch(() => {})
+          }
+
+          const updatedFilters = {
+            ...filters,
+            search: '',
+            status: '',
+            classification: '',
+            sortBy: 'recent',
+          }
+          setFilters(updatedFilters)
+          setPage(1)
           fetchStats()
-          fetchInfluencers(1, filters)
+          fetchInfluencers(1, updatedFilters)
         }}
       />
 

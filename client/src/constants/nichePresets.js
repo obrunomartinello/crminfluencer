@@ -1,5 +1,16 @@
 // client/src/constants/nichePresets.js
 
+export const PEDRO_STATUSES = [
+  'Novo',
+  'Sem resposta',
+  'Em negociação',
+  'Fechou',
+  'Não interessado',
+  'Recusado - métricas ruins',
+  'Recusado - Remarketing',
+  'Outro momento',
+]
+
 export const NICHE_PRESETS = [
   {
     id: 'varzea_futsal',
@@ -8,10 +19,10 @@ export const NICHE_PRESETS = [
     description: 'Páginas e jogadores de campeonatos de várzea, futsal amador, X1 e copas de bairro. Público masculino 20-45 anos que já aposta todo fim de semana.',
     defaultKeywords: [
       'futebol varzea',
-      'futsal amador brasil',
-      'campeonato de varzea',
-      'x1 brasil futebol',
+      'futsal amador',
+      'x1 futebol',
       'resenha da varzea',
+      'gol de varzea',
     ],
   },
   {
@@ -21,9 +32,9 @@ export const NICHE_PRESETS = [
     description: 'Criadores de desafios de sinuca, torneios de truco, dominó e resenha de boteco. Demografia 100% alinhada com apostas esportivas e jogos rápidos.',
     defaultKeywords: [
       'sinuca brasil',
-      'desafio sinuca',
       'sinuquinha',
-      'torneio de truco',
+      'desafio sinuca',
+      'truco raiz',
       'resenha de boteco',
     ],
   },
@@ -34,10 +45,10 @@ export const NICHE_PRESETS = [
     description: 'Criadores de comédia cotidiana, vida na roça e interior (Nordeste, MG, GO). Têm caixinha de perguntas lotada e cobram 1/4 do preço das capitais.',
     defaultKeywords: [
       'humor nordestino',
-      'comedia sertao',
+      'comedia nordeste',
+      'vaquejada',
+      'humor da roca',
       'resenha nordeste',
-      'vida na roca humor',
-      'rotina do interior',
     ],
   },
   {
@@ -46,11 +57,11 @@ export const NICHE_PRESETS = [
     badge: 'Stories Viciantes',
     description: 'Vlogs diários de oficina, som automotivo, grau de moto e vivência real. Fazem 30+ Stories por dia do bom dia ao boa noite com alta retenção.',
     defaultKeywords: [
-      'grau de moto brasil',
-      'som automotivo brasil',
-      'carro turbo vlog',
-      'diario de oficina',
-      'loucos por moto',
+      'grau de moto',
+      'som automotivo',
+      'carro rebaixado',
+      '244 grau',
+      'oficina vlog',
     ],
   },
   {
@@ -59,11 +70,11 @@ export const NICHE_PRESETS = [
     badge: 'Público +25 c/ Renda',
     description: 'Assadores de fim de semana, churrasco na brasa e pescadores esportivos. Público masculino com ticket médio de depósito mais alto.',
     defaultKeywords: [
-      'churrasco raiz brasil',
+      'churrasco raiz',
       'pesca esportiva brasil',
-      'churrasqueiro amador',
-      'pescaria sertao',
-      'costela no fogo de chao',
+      'churrasco brasa',
+      'pescaria brasil',
+      'costela fogo de chao',
     ],
   },
   {
@@ -72,11 +83,11 @@ export const NICHE_PRESETS = [
     badge: 'Público Quente (.bet.br)',
     description: 'Comentaristas de torcida, debates esportivos regionais e canais de palpites sem vínculo exclusivo, prontos para fechar como afiliados.',
     defaultKeywords: [
-      'palpites futebol brasil',
       'resenha esportiva',
-      'debate futebol regional',
-      'dicas de apostas',
-      'torcida resenha',
+      'palpites futebol',
+      'futebol brasileiro',
+      'cartola dicas',
+      'zueira futebol',
     ],
   },
 ]

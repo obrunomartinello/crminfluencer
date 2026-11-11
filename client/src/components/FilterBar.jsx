@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, Sparkles, RotateCw, ChevronDown, UserPlus, ShieldCheck, ShieldAlert, Users } from 'lucide-react'
+import { Search, Sparkles, RotateCw, ChevronDown, UserPlus, ShieldCheck, ArrowUpDown } from 'lucide-react'
+import { PEDRO_STATUSES } from '../constants/nichePresets'
 
 export default function FilterBar({
   filters,
@@ -11,6 +12,10 @@ export default function FilterBar({
 }) {
   const [searchValue, setSearchValue] = useState(filters.search || '')
   const debounceRef = useRef(null)
+
+  useEffect(() => {
+    setSearchValue(filters.search || '')
+  }, [filters.search])
 
   const handleSearchChange = (e) => {
     const val = e.target.value
@@ -46,7 +51,7 @@ export default function FilterBar({
           type="text"
           value={searchValue}
           onChange={handleSearchChange}
-          placeholder="Buscar criador por @username ou nome..."
+          placeholder="Buscar por @, nome, nicho, bio ou termo minerado..."
           className="w-full pl-10 pr-4 py-2 border rounded-xl text-xs transition-colors"
           style={{
             backgroundColor: 'var(--input-bg)',
@@ -57,7 +62,49 @@ export default function FilterBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {/* Filtro de Porte de Seguidores (Mínimo 15k) */}
+        {/* Ordenação */}
+        <div className="relative">
+          <select
+            value={filters.sortBy || 'recent'}
+            onChange={(e) => onFilterChange('sortBy', e.target.value)}
+            className="appearance-none border text-xs font-medium pl-3 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer transition-colors"
+            style={{
+              backgroundColor: 'var(--input-bg)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-primary)',
+            }}
+            title="Ordenação da tabela"
+          >
+            <option value="recent">🕒 Mais Recentes</option>
+            <option value="score">💎 Maior Score (Ouro)</option>
+            <option value="followers">👥 Mais Seguidores</option>
+            <option value="views">🎬 Mais Views Reels</option>
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
+            <ArrowUpDown size={13} />
+          </div>
+        </div>
+
+        {/* Toggle Só Minerados */}
+        <button
+          type="button"
+          onClick={() => onFilterChange('onlyMined', !filters.onlyMined)}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+            filters.onlyMined
+              ? 'bg-blue-500/15 border-blue-500/50 text-blue-600 dark:text-blue-400'
+              : 'hover:border-zinc-400 text-zinc-500'
+          }`}
+          style={{
+            backgroundColor: filters.onlyMined ? undefined : 'var(--input-bg)',
+            borderColor: filters.onlyMined ? undefined : 'var(--border-color)',
+          }}
+          title="Filtrar apenas leads descobertos pela mineração"
+        >
+          <Sparkles size={13} className={filters.onlyMined ? 'text-blue-500' : 'text-zinc-400'} />
+          <span>{filters.onlyMined ? 'Só Minerados' : 'Novos / Minerados'}</span>
+        </button>
+
+        {/* Filtro de Porte de Seguidores */}
         <div className="relative">
           <select
             value={filters.minFollowers || ''}
@@ -80,7 +127,7 @@ export default function FilterBar({
           </div>
         </div>
 
-        {/* Status Dropdown */}
+        {/* Status Dropdown alinhado com os 7 status reais do Pedro */}
         <div className="relative">
           <select
             value={filters.status || ''}
@@ -88,17 +135,17 @@ export default function FilterBar({
             className="appearance-none border text-xs font-medium pl-3 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer transition-colors"
             style={{
               backgroundColor: 'var(--input-bg)',
-              borderColor: 'var(--border-color)',
+              borderColor: filters.status ? '#3B82F6' : 'var(--border-color)',
               color: 'var(--text-primary)',
             }}
           >
             <option value="">Status: Todos</option>
-            <option value="Novo">Novo</option>
-            <option value="Qualificado">Qualificado</option>
-            <option value="Abordado">Abordado</option>
-            <option value="Negociando">Negociando</option>
-            <option value="Fechado">Fechado</option>
-            <option value="Desqualificado">Desqualificado</option>
+            {PEDRO_STATUSES.map((st) => (
+              <option key={st} value={st}>
+                {st}
+              </option>
+            ))}
+            <option value="Remarketing">♻️ Remarketing (Grupo)</option>
           </select>
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
             <ChevronDown size={14} />
@@ -113,15 +160,15 @@ export default function FilterBar({
             className="appearance-none border text-xs font-medium pl-3 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer transition-colors"
             style={{
               backgroundColor: 'var(--input-bg)',
-              borderColor: 'var(--border-color)',
+              borderColor: filters.classification ? '#3B82F6' : 'var(--border-color)',
               color: 'var(--text-primary)',
             }}
           >
             <option value="">Classe: Todas</option>
-            <option value="OURO">💎 OURO (75-100)</option>
-            <option value="PRATA">🥈 PRATA (50-74)</option>
-            <option value="BRONZE">🥉 BRONZE (30-49)</option>
-            <option value="LIXO">🗑️ LIXO (&lt;30)</option>
+            <option value="OURO">💎 OURO (80-100)</option>
+            <option value="PRATA">🥈 PRATA (65-79)</option>
+            <option value="BRONZE">🥉 BRONZE (45-64)</option>
+            <option value="LIXO">🗑️ LIXO (&lt;45)</option>
           </select>
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
             <ChevronDown size={14} />

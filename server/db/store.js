@@ -7,6 +7,9 @@ const seed = buildInitialDatabase()
 
 let inMemoryInfluencers = seed.influencers.map((inf, index) => {
   const { score, classification } = calculateScore(inf)
+  const seedDate = inf.contact_date && inf.contact_date < '2026-11-07'
+    ? `${inf.contact_date}T12:00:00.000Z`
+    : '2026-11-05T12:00:00.000Z'
   return {
     id: index + 1,
     ...inf,
@@ -19,7 +22,9 @@ let inMemoryInfluencers = seed.influencers.map((inf, index) => {
     story_asking_price: 0,
     estimated_revenue: 0,
     roi_verdict: null,
-    created_at: inf.contact_date ? `${inf.contact_date}T12:00:00.000Z` : new Date().toISOString(),
+    last_mined_at: null,
+    source_query: null,
+    created_at: seedDate,
   }
 })
 
@@ -47,8 +52,30 @@ const store = {
     return !!supabase
   },
 
+  async checkSupabaseHealth() {
+    if (!supabase) {
+      return { configured: false, online: false, reason: 'not_configured' }
+    }
+    try {
+      const result = await Promise.race([
+        supabase.from('influencers').select('id', { count: 'exact', head: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase timeout/paused')), 2500)),
+      ])
+      if (result.error) {
+        return { configured: true, online: false, reason: result.error.message }
+      }
+      return { configured: true, online: true, count: result.count || 0 }
+    } catch (err) {
+      return { configured: true, online: false, reason: err.message }
+    }
+  },
+
   listGames() {
     return GAMES
+  },
+
+  getAllUsernames() {
+    return new Set(inMemoryInfluencers.map(i => (i.username || '').toLowerCase()).filter(Boolean))
   },
 
   // --- CAPTAÇÃO & DASHBOARD GERAL ---
@@ -92,7 +119,7 @@ const store = {
     }
   },
 
-  async listInfluencers({ search, status, classification, minFollowers, hideAgencies, page = 1, limit = 20 }) {
+  async listInfluencers({ search, status, classification, minFollowers, hideAgencies, onlyMined, sortBy = 'recent', page = 1, limit = 20 }) {
     const pageNum = Math.max(1, parseInt(page) || 1)
     const limitNum = Math.max(1, parseInt(limit) || 20)
     const offset = (pageNum - 1) * limitNum
@@ -104,7 +131,11 @@ const store = {
       filtered = filtered.filter(i =>
         (i.username && i.username.toLowerCase().includes(s)) ||
         (i.full_name && i.full_name.toLowerCase().includes(s)) ||
-        (i.campaign_game && i.campaign_game.toLowerCase().includes(s))
+        (i.campaign_game && i.campaign_game.toLowerCase().includes(s)) ||
+        (i.niche && i.niche.toLowerCase().includes(s)) ||
+        (i.bio && i.bio.toLowerCase().includes(s)) ||
+        (i.user_notes && i.user_notes.toLowerCase().includes(s)) ||
+        (i.source_query && i.source_query.toLowerCase().includes(s))
       )
     }
 
@@ -129,8 +160,25 @@ const store = {
       filtered = filtered.filter(i => !i.is_agency)
     }
 
-    // Ordenar: Fechados / Ouro primeiro
-    filtered.sort((a, b) => (b.score || 0) - (a.score || 0))
+    if (onlyMined === true || onlyMined === 'true') {
+      filtered = filtered.filter(i => !!i.source_query || i.status === 'Novo')
+    }
+
+    // Ordenação flexível (Mais recentes por padrão para leads minerados aparecerem no topo)
+    if (sortBy === 'score') {
+      filtered.sort((a, b) => (b.score || 0) - (a.score || 0))
+    } else if (sortBy === 'followers') {
+      filtered.sort((a, b) => (b.followers_count || 0) - (a.followers_count || 0))
+    } else if (sortBy === 'views') {
+      filtered.sort((a, b) => (b.avg_reels_views || 0) - (a.avg_reels_views || 0))
+    } else {
+      filtered.sort((a, b) => {
+        const timeA = Math.max(new Date(a.last_mined_at || 0).getTime(), new Date(a.created_at || 0).getTime())
+        const timeB = Math.max(new Date(b.last_mined_at || 0).getTime(), new Date(b.created_at || 0).getTime())
+        if (timeB !== timeA) return timeB - timeA
+        return (b.score || 0) - (a.score || 0)
+      })
+    }
 
     const total = filtered.length
     const paginated = filtered.slice(offset, offset + limitNum)
@@ -190,25 +238,54 @@ const store = {
     const username = (item.username || '').toLowerCase().replace(/^@+/, '').trim()
     if (!username) return false
 
+    const now = new Date().toISOString()
     const existingIndex = inMemoryInfluencers.findIndex(i => i.username.toLowerCase() === username.toLowerCase())
 
     if (existingIndex !== -1) {
-      inMemoryInfluencers[existingIndex] = {
-        ...inMemoryInfluencers[existingIndex],
+      const existing = inMemoryInfluencers[existingIndex]
+      const updatedRecord = {
+        ...existing,
         ...item,
         username,
+        // Preserva histórico comercial do Pedro caso o lead já exista no CRM
+        status: existing.status && existing.status !== 'Novo' ? existing.status : (item.status || existing.status || 'Novo'),
+        user_notes: existing.user_notes || item.user_notes || '',
+        campaign_game: existing.campaign_game || item.campaign_game || null,
+        paid_amount: existing.paid_amount || item.paid_amount || 0,
+        revenue_generated: existing.revenue_generated || item.revenue_generated || 0,
+        last_mined_at: item.last_mined_at || now,
+        created_at: existing.created_at || now,
       }
+      inMemoryInfluencers[existingIndex] = updatedRecord
+      return { action: 'updated', record: updatedRecord }
     } else {
-      inMemoryInfluencers.unshift({
+      const newRecord = {
         id: nextId++,
         status: item.status || 'Novo',
         user_notes: item.user_notes || '',
-        created_at: new Date().toISOString(),
+        created_at: now,
+        last_mined_at: item.last_mined_at || now,
         ...item,
         username,
-      })
+      }
+      inMemoryInfluencers.unshift(newRecord)
+      return { action: 'inserted', record: newRecord }
     }
-    return true
+  },
+
+  async batchUpsertInfluencers(items = []) {
+    const records = []
+    let inserted = 0
+    let updated = 0
+    for (const item of items) {
+      const res = await this.upsertInfluencer(item)
+      if (res && res.record) {
+        records.push(res.record)
+        if (res.action === 'inserted') inserted++
+        else updated++
+      }
+    }
+    return { inserted, updated, records }
   },
 
   // --- MÓDULO: PUBLICIDADES (CONTROLE FINANCEIRO) ---

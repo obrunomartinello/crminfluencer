@@ -27,18 +27,42 @@ export const api = {
     return request('/games')
   },
 
+  // --- HEALTH / SUPABASE ---
+  async getHealth() {
+    return request('/health')
+  },
+
   // --- CAPTAÇÃO ---
-  async getInfluencers({ search = '', status = '', classification = '', minFollowers = '', hideAgencies = false, page = 1, limit = 20 } = {}) {
+  async getInfluencers({
+    search = '',
+    status = '',
+    classification = '',
+    minFollowers = '',
+    hideAgencies = false,
+    onlyMined = false,
+    sortBy = 'recent',
+    page = 1,
+    limit = 20,
+  } = {}) {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (status) params.set('status', status)
     if (classification) params.set('classification', classification)
     if (minFollowers) params.set('minFollowers', minFollowers)
     if (hideAgencies) params.set('hideAgencies', 'true')
+    if (onlyMined) params.set('onlyMined', 'true')
+    if (sortBy) params.set('sortBy', sortBy)
     if (page) params.set('page', page)
     if (limit) params.set('limit', limit)
 
     return request(`/influencers?${params.toString()}`)
+  },
+
+  async batchSyncInfluencers(items) {
+    return request('/influencers/batch-sync', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    })
   },
 
   async getStats() {
@@ -159,10 +183,10 @@ export const api = {
   },
 
   // --- MINERAÇÃO ASSÍNCRONA ---
-  async startMine(query, count = 25) {
+  async startMine(query, count = 20, mode = 'hybrid', skipExisting = true) {
     return request('/mine/start', {
       method: 'POST',
-      body: JSON.stringify({ query, count }),
+      body: JSON.stringify({ query, count, mode, skipExisting }),
     })
   },
 

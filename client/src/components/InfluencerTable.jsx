@@ -1,4 +1,5 @@
 import React from 'react'
+import { PEDRO_STATUSES } from '../constants/nichePresets'
 import {
   ExternalLink,
   Phone,
@@ -88,19 +89,24 @@ export default function InfluencerTable({
 
   const getStatusColor = (status) => {
     switch (status) {
+      case 'Fechou':
       case 'Fechado':
         return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30'
+      case 'Em negociação':
       case 'Negociando':
         return 'bg-purple-500/15 text-purple-600 dark:text-purple-300 border-purple-500/30'
-      case 'Abordado':
-        return 'bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30'
-      case 'Qualificado':
+      case 'Recusado - Remarketing':
+      case 'Outro momento':
         return 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30'
+      case 'Sem resposta':
+        return 'bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30'
+      case 'Não interessado':
+      case 'Recusado - métricas ruins':
       case 'Desqualificado':
-        return 'bg-zinc-400/10 text-zinc-500 border-zinc-400/20'
+        return 'bg-red-500/10 text-red-500 border-red-500/20'
       case 'Novo':
       default:
-        return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-400/25'
+        return 'bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-500/30'
     }
   }
 
@@ -258,8 +264,13 @@ export default function InfluencerTable({
                             <ExternalLink size={9} className="shrink-0" />
                           </a>
                           {inf.niche && inf.niche !== 'Geral' && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-500/10 text-zinc-500">
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-500/10 text-zinc-500 truncate max-w-[90px]">
                               {inf.niche}
+                            </span>
+                          )}
+                          {inf.source_query && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-500 font-medium truncate max-w-[110px]" title={`Descoberto pela busca: ${inf.source_query}`}>
+                              🔍 {inf.source_query}
                             </span>
                           )}
                         </div>
@@ -379,12 +390,11 @@ export default function InfluencerTable({
                         inf.status
                       )}`}
                     >
-                      <option value="Novo">Novo</option>
-                      <option value="Qualificado">Qualificado</option>
-                      <option value="Abordado">Abordado</option>
-                      <option value="Negociando">Negociando</option>
-                      <option value="Fechado">Fechado</option>
-                      <option value="Desqualificado">Desqualificado</option>
+                      {PEDRO_STATUSES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
                     </select>
                   </td>
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { X, UserPlus, DollarSign, TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
+import { PEDRO_STATUSES } from '../constants/nichePresets'
 
 export default function CreateLeadModal({ open, onClose, onCreated }) {
   const [username, setUsername] = useState('')
@@ -253,12 +254,11 @@ export default function CreateLeadModal({ open, onClose, onCreated }) {
                   color: 'var(--text-primary)',
                 }}
               >
-                <option value="Novo">Novo</option>
-                <option value="Qualificado">Qualificado</option>
-                <option value="Abordado">Abordado</option>
-                <option value="Negociando">Negociando</option>
-                <option value="Fechado">Fechado (Ativo)</option>
-                <option value="Desqualificado">Desqualificado</option>
+                {PEDRO_STATUSES.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
