@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 3 — Funil SDR: Minerados, Kanban & Ficha
+ */
 import React, { useState } from 'react'
 import {
   ExternalLink,
@@ -13,7 +16,7 @@ const COLUMNS = [
   {
     id: 'to_contact',
     title: '🎯 Para Abordar',
-    subtitle: 'Leads novos (1ª ficha)',
+    subtitle: 'Leads novos (puxar p/ contato)',
     targetStatus: 'Novo',
     dotClass: 'bg-amber-500',
     badgeClass: 'bg-amber-500/12 text-amber-700 dark:text-amber-300 border-amber-500/25',
@@ -395,18 +398,23 @@ export default function KanbanBoard({
                           <span
                             className="px-1.5 py-0.5 rounded font-semibold"
                             style={{ backgroundColor: 'var(--bg-card-secondary)', color: 'var(--text-primary)' }}
+                            title="Total de seguidores no Instagram"
                           >
-                            🎲 {formatCompact(inf.followers_count)} seg
+                            👥 {formatCompact(inf.followers_count)} seguidores
                           </span>
                           <span
                             className="px-1.5 py-0.5 rounded font-semibold"
                             style={{ backgroundColor: 'var(--bg-card-secondary)', color: 'var(--text-primary)' }}
+                            title="Média de visualizações em Reels (n/d = lead importado sem coleta de Reels)"
                           >
-                            👁️ {formatCompact(inf.avg_reels_views)} views
+                            👁️ {inf.avg_reels_views > 0 ? `${formatCompact(inf.avg_reels_views)} views Reels` : 'views n/d'}
                           </span>
                           {inf.followers_count >= 15000 && (
-                            <span className="px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">
-                              🔥 15k+
+                            <span
+                              className="px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25"
+                              title="Criador qualificado acima de 15 mil seguidores"
+                            >
+                              🔥 +15k seg.
                             </span>
                           )}
                           {inf.outreach_channel && (

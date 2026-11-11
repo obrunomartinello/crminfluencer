@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 3 — Funil SDR: Minerados, Kanban & Ficha (Ficha Completa)
+ */
 import React, { useState, useEffect } from 'react'
 import {
   X,
@@ -546,7 +549,7 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
 
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {formatNum(influencer.followers_count)} seg • {formatNum(influencer.avg_reels_views)} views Reels
+                    {formatNum(influencer.followers_count)} seguidores • {formatNum(influencer.avg_reels_views)} views Reels
                   </span>
                   <button
                     type="submit"

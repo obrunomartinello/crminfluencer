@@ -1,8 +1,16 @@
+/**
+ * @pilar PILAR 3 — Funil SDR: Minerados, Kanban & Ficha
+ */
 import React, { useState } from 'react'
 import { X, UserPlus, DollarSign, TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 import { PEDRO_STATUSES } from '../constants/nichePresets'
 
 export default function CreateLeadModal({ open, onClose, onCreated }) {
+  if (!open) return null
+  return <CreateLeadModalForm onClose={onClose} onCreated={onCreated} />
+}
+
+function CreateLeadModalForm({ onClose, onCreated }) {
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [followers, setFollowers] = useState('')
@@ -15,8 +23,6 @@ export default function CreateLeadModal({ open, onClose, onCreated }) {
   const [niche, setNiche] = useState('Geral')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-
-  if (!open) return null
 
   const formatMoney = (val) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)

@@ -1,3 +1,4 @@
+process.env.SKIP_SUPABASE_WRITE = 'true'
 const express = require('express')
 const assert = require('assert')
 

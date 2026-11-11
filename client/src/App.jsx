@@ -1,7 +1,11 @@
+/**
+ * @pilar PILAR 5 — Shell Principal, Roteamento de Abas & Estado Global
+ */
 import React, { useState, useEffect, useCallback } from 'react'
 import { api } from './lib/api'
 import Sidebar from './components/Sidebar'
 import DashboardView from './components/DashboardView'
+import MinedLeadsView from './components/MinedLeadsView'
 import KanbanBoard from './components/KanbanBoard'
 import SentLeadsView from './components/SentLeadsView'
 import FilterBar from './components/FilterBar'
@@ -27,6 +31,10 @@ const TAB_HEADERS = {
   dashboard: {
     title: '🎰 Dashboard da Casa',
     subtitle: 'Placar ao vivo da captação SDR, envios e lucro das apostas',
+  },
+  mined: {
+    title: '💎 Leads Minerados por Data',
+    subtitle: 'Varreduras numeradas (Hoje, Ontem, Semana Passada) + rastreio de onde cada lead foi',
   },
   kanban: {
     title: '🃏 CRM Kanban — Mesa de Prospecção',
@@ -116,6 +124,7 @@ export default function App() {
   const [quotaLoading, setQuotaLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [minedRefreshKey, setMinedRefreshKey] = useState(0)
 
   // Drawer & Modais
   const [selectedInfluencer, setSelectedInfluencer] = useState(null)
@@ -221,6 +230,7 @@ export default function App() {
     if (tabId === 'kanban') {
       const nextFilters = {
         ...filters,
+        search: preset.search !== undefined ? preset.search : filters.search,
         onlyMined: preset.onlyMined !== undefined ? preset.onlyMined : filters.onlyMined,
         status: preset.status !== undefined ? preset.status : filters.status,
       }
@@ -267,6 +277,7 @@ export default function App() {
         updateCachedLead(res.data)
       }
       fetchStats()
+      setMinedRefreshKey((k) => k + 1)
 
       if (newStatus === 'Fechou') {
         const inf = influencers.find((i) => String(i.id) === String(id))
@@ -316,6 +327,7 @@ export default function App() {
         updateCachedLead(res.data)
       }
       fetchStats()
+      setMinedRefreshKey((k) => k + 1)
     } catch (err) {
       console.error('Erro ao marcar mensagem enviada:', err.message)
       fetchInfluencers(page, filters, kanbanMode)
@@ -333,6 +345,7 @@ export default function App() {
       )
       updateCachedLead(updated)
       fetchStats()
+      setMinedRefreshKey((k) => k + 1)
     } catch (err) {
       console.error('Erro ao atualizar influenciador:', err.message)
     }
@@ -543,6 +556,17 @@ export default function App() {
             />
           )}
 
+          {/* VIEW 1.5: ABA EXCLUSIVA MINERADOS POR DATA + RASTREIO */}
+          {currentTab === 'mined' && (
+            <MinedLeadsView
+              refreshKey={minedRefreshKey}
+              onSelectInfluencer={setSelectedInfluencer}
+              onMarkSent={handleMarkSent}
+              onMineClick={() => setMineModalOpen(true)}
+              onOpenInKanban={(inf) => handleNavigateTab('kanban', { search: inf.username, onlyMined: false })}
+            />
+          )}
+
           {/* VIEW 2: CRM KANBAN (COM ALTERNADOR KANBAN / LISTA) */}
           {currentTab === 'kanban' && (
             <div className="space-y-4">
@@ -697,8 +721,9 @@ export default function App() {
           }
           setFilters(updatedFilters)
           setPage(1)
-          setCurrentTab('kanban')
+          setCurrentTab('mined')
           setKanbanMode('board')
+          setMinedRefreshKey((k) => k + 1)
           fetchStats()
           fetchInfluencers(1, updatedFilters, 'board')
           fetchApifyQuota(true)

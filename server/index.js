@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 5 — Infraestrutura, Keepalive Supabase & Express Server
+ */
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')

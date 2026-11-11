@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 5 — Infra, Navegação & Identidade Visual
+ */
 import React from 'react'
 import { X } from 'lucide-react'
 import BrandLogo from './BrandLogo'
@@ -11,6 +14,7 @@ export default function Sidebar({
 }) {
   const toContactCount = stats?.toContactCount ?? 0
   const sentTotalCount = stats?.sentTotalCount ?? 0
+  const minedCount = stats?.minedCount ?? 0
 
   const mainNav = [
     {
@@ -18,6 +22,12 @@ export default function Sidebar({
       label: 'Dashboard',
       emoji: '📊',
       badge: null,
+    },
+    {
+      id: 'mined',
+      label: 'Minerados',
+      emoji: '💎',
+      badge: minedCount > 0 ? { text: String(minedCount), tone: 'amber' } : null,
     },
     {
       id: 'kanban',
@@ -73,7 +83,9 @@ export default function Sidebar({
             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               item.badge.tone === 'vegas'
                 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm'
-                : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25'
+                : item.badge.tone === 'amber'
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                  : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25'
             }`}
           >
             {item.badge.text}
@@ -157,6 +169,10 @@ export default function Sidebar({
         <div className="font-bold text-[10px] uppercase tracking-wider flex items-center justify-between" style={{ color: 'var(--text-primary)' }}>
           <span>🎲 Placar da Mesa</span>
           <span className="text-emerald-600 dark:text-emerald-400">AO VIVO</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>💎 Minerados:</span>
+          <strong className="text-amber-500">{minedCount}</strong>
         </div>
         <div className="flex items-center justify-between">
           <span>🎯 Para abordar:</span>

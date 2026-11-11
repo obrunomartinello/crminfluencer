@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 4 — Financeiro: Publicidades & Metas (Rotas /api/publicidades)
+ */
 const express = require('express')
 const router = express.Router()
 const store = require('../db/store')

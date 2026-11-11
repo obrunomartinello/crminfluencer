@@ -1,9 +1,17 @@
+/**
+ * @pilar PILAR 1 — Banco de Dados & Persistência Supabase
+ * Centraliza leitura/escrita em memória rápida com sincronização real no Supabase
+ * (`influencers`, e `publicidades`/`metas` quando criadas via schema.sql).
+ */
 const supabase = require('./supabase')
 const { calculateScore } = require('../services/scoring')
 const { buildInitialDatabase, formatPhoneBR, normalizeGame } = require('../services/importer')
 
 // Inicialização com dados reais das 3 planilhas do Pedro (.bet.br)
 const seed = buildInitialDatabase()
+const SEED_USERNAMES = new Set(
+  seed.influencers.map(i => (i.username || '').toLowerCase().replace(/^@+/, '').trim()).filter(Boolean)
+)
 
 let inMemoryInfluencers = seed.influencers.map((inf, index) => {
   const { score, classification } = calculateScore(inf)
@@ -44,19 +52,328 @@ let nextMetaId = inMemoryMetas.length + 1
 
 const GAMES = ['Block Win', 'Bubble Win', 'Cust Win', 'Count Masters']
 
-const BASE_FIELDS = [
+const SUPABASE_INFLUENCER_COLUMNS = [
   'username', 'full_name', 'profile_pic_url', 'bio', 'external_url',
   'followers_count', 'following_count', 'posts_count', 'avg_reels_views',
   'engagement_rate', 'whatsapp', 'email', 'has_competitor', 'competitor_name',
   'niche', 'score', 'classification', 'status', 'user_notes',
   'story_views_avg', 'story_clicks_avg', 'story_asking_price', 'estimated_revenue',
-  'roi_verdict', 'paid_amount', 'revenue_generated', 'last_campaign_date',
-  'is_agency', 'promotes_raffle', 'promotes_shopee', 'is_ghost', 'campaign_game',
+  'roi_verdict', 'is_agency', 'promotes_raffle', 'promotes_shopee',
+  'created_at', 'paid_amount', 'revenue_generated', 'last_campaign_date',
+  'outreach_channel', 'contacted_at', 'last_contact_at', 'last_mined_at',
+  'source_query', 'is_ghost', 'campaign_game',
 ]
+
+const EXTRA_META_FIELDS = [
+  'outreach_channel',
+  'contacted_at',
+  'last_contact_at',
+  'last_mined_at',
+  'source_query',
+  'is_ghost',
+  'campaign_game',
+]
+
+const missingInfluencerColumns = new Set()
+const supabaseIdMap = new Map()
+const supabaseTables = {
+  influencers: !!supabase,
+  publicidades: false,
+  metas: false,
+}
+let hasHydrated = false
+let initPromise = null
+let warnedMissingTables = false
+
+function isSupabaseWriteEnabled() {
+  return Boolean(supabase && process.env.SKIP_SUPABASE_WRITE !== 'true')
+}
+
+function isMinedLead(inf) {
+  return Boolean(inf && (inf.source_query || inf.last_mined_at))
+}
+
+function normalizeNullableDate(val) {
+  if (val === undefined || val === null || val === '') return null
+  return val
+}
+
+function unpackUserNotes(rawNotes) {
+  if (!rawNotes || typeof rawNotes !== 'string') {
+    return { cleanNotes: rawNotes || '', meta: {} }
+  }
+  const match = rawNotes.match(/\n?\[CRM_META:(\{[\s\S]*?\})\]\s*$/)
+  if (!match) {
+    return { cleanNotes: rawNotes, meta: {} }
+  }
+  let meta = {}
+  try {
+    meta = JSON.parse(match[1]) || {}
+  } catch {
+    meta = {}
+  }
+  const cleanNotes = rawNotes.slice(0, match.index).replace(/\s+$/, '')
+  return { cleanNotes, meta }
+}
+
+function buildInfluencerSupabasePayload(record) {
+  const payload = {}
+  const fallbackMeta = {}
+
+  for (const col of SUPABASE_INFLUENCER_COLUMNS) {
+    if (missingInfluencerColumns.has(col)) {
+      if (EXTRA_META_FIELDS.includes(col) && record[col] !== undefined && record[col] !== null && record[col] !== '' && record[col] !== false) {
+        fallbackMeta[col] = record[col]
+      }
+      continue
+    }
+
+    if (record[col] === undefined) continue
+
+    if (['followers_count', 'following_count', 'posts_count', 'avg_reels_views', 'story_views_avg', 'story_clicks_avg'].includes(col)) {
+      payload[col] = parseInt(record[col], 10) || 0
+    } else if (['engagement_rate', 'score', 'story_asking_price', 'estimated_revenue', 'paid_amount', 'revenue_generated'].includes(col)) {
+      payload[col] = parseFloat(record[col]) || 0
+    } else if (['has_competitor', 'is_agency', 'promotes_raffle', 'promotes_shopee', 'is_ghost'].includes(col)) {
+      payload[col] = Boolean(record[col])
+    } else if (['created_at', 'last_campaign_date', 'contacted_at', 'last_contact_at', 'last_mined_at'].includes(col)) {
+      payload[col] = normalizeNullableDate(record[col])
+    } else {
+      payload[col] = record[col]
+    }
+  }
+
+  let baseNotes = typeof record.user_notes === 'string' ? record.user_notes : ''
+  if (Object.keys(fallbackMeta).length > 0) {
+    const encoded = `[CRM_META:${JSON.stringify(fallbackMeta)}]`
+    baseNotes = baseNotes ? `${baseNotes}\n${encoded}` : encoded
+  }
+  if (!missingInfluencerColumns.has('user_notes')) {
+    payload.user_notes = baseNotes
+  }
+
+  return payload
+}
+
+async function persistInfluencerToSupabase(record) {
+  if (!isSupabaseWriteEnabled() || !record?.username) return null
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const payload = buildInfluencerSupabasePayload(record)
+    const { data, error } = await supabase
+      .from('influencers')
+      .upsert(payload, { onConflict: 'username' })
+      .select('id, username')
+      .single()
+
+    if (!error) {
+      if (data?.id) supabaseIdMap.set(record.username.toLowerCase(), data.id)
+      return data
+    }
+
+    const msg = error.message || ''
+    const missingMatch = msg.match(/Could not find the '([^']+)' column/) || msg.match(/column "?([a-z0-9_]+)"? of relation/i)
+    if (missingMatch && missingMatch[1] && !missingInfluencerColumns.has(missingMatch[1])) {
+      missingInfluencerColumns.add(missingMatch[1])
+      continue
+    }
+
+    console.warn('[Supabase sync influencers]', msg)
+    return null
+  }
+  return null
+}
+
+async function deleteInfluencerFromSupabase(username) {
+  if (!isSupabaseWriteEnabled() || !username) return
+  try {
+    const { error } = await supabase.from('influencers').delete().eq('username', username.toLowerCase())
+    if (error) console.warn('[Supabase delete influencers]', error.message)
+    supabaseIdMap.delete(username.toLowerCase())
+  } catch (err) {
+    console.warn('[Supabase delete influencers]', err.message)
+  }
+}
+
+async function persistPublicidadeToSupabase(ad) {
+  if (!isSupabaseWriteEnabled() || !supabaseTables.publicidades || !ad) return null
+  try {
+    const payload = { ...ad }
+    delete payload.id
+    const { data, error } = await supabase.from('publicidades').upsert(payload).select('id').single()
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') {
+        supabaseTables.publicidades = false
+        return null
+      }
+      console.warn('[Supabase sync publicidades]', error.message)
+      return null
+    }
+    return data
+  } catch (err) {
+    console.warn('[Supabase sync publicidades]', err.message)
+    return null
+  }
+}
+
+async function persistMetaToSupabase(meta) {
+  if (!isSupabaseWriteEnabled() || !supabaseTables.metas || !meta) return null
+  try {
+    const payload = { ...meta }
+    delete payload.id
+    const { data, error } = await supabase.from('metas').upsert(payload).select('id').single()
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') {
+        supabaseTables.metas = false
+        return null
+      }
+      console.warn('[Supabase sync metas]', error.message)
+      return null
+    }
+    return data
+  } catch (err) {
+    console.warn('[Supabase sync metas]', err.message)
+    return null
+  }
+}
+
+function hydrateInfluencerRow(row) {
+  const username = (row.username || '').toLowerCase().replace(/^@+/, '').trim()
+  const { cleanNotes, meta } = unpackUserNotes(row.user_notes)
+  const merged = {
+    ...row,
+    ...meta,
+    username,
+    user_notes: cleanNotes,
+    status: row.status || meta.status || 'Novo',
+    score: row.score || 0,
+    story_views_avg: row.story_views_avg || 0,
+    story_clicks_avg: row.story_clicks_avg || 0,
+    story_asking_price: row.story_asking_price || 0,
+  }
+  // Leads salvos no Supabase fora da planilha inicial do Pedro vieram de mineração/cadastro dinâmico
+  if (!SEED_USERNAMES.has(username) && !merged.last_mined_at && !merged.source_query) {
+    merged.last_mined_at = merged.created_at || new Date().toISOString()
+    merged.source_query = merged.niche ? `Mineração (${merged.niche})` : 'Mineração (Supabase)'
+  }
+  return merged
+}
+
+async function hydrateFromSupabase() {
+  if (!isSupabaseWriteEnabled()) {
+    hasHydrated = true
+    return
+  }
+
+  try {
+    const { data: rows, error } = await supabase
+      .from('influencers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(2500)
+
+    if (!error && Array.isArray(rows)) {
+      supabaseTables.influencers = true
+      const usedIds = new Set(inMemoryInfluencers.map(i => i.id))
+
+      for (const rawRow of rows) {
+        const hydrated = hydrateInfluencerRow(rawRow)
+        if (!hydrated.username) continue
+        if (rawRow.id) supabaseIdMap.set(hydrated.username, rawRow.id)
+
+        const existingIdx = inMemoryInfluencers.findIndex(
+          i => (i.username || '').toLowerCase() === hydrated.username
+        )
+
+        if (existingIdx !== -1) {
+          const existing = inMemoryInfluencers[existingIdx]
+          inMemoryInfluencers[existingIdx] = {
+            ...existing,
+            ...hydrated,
+            id: existing.id,
+            last_mined_at: hydrated.last_mined_at || existing.last_mined_at || null,
+            source_query: hydrated.source_query || existing.source_query || null,
+          }
+        } else {
+          let assignedId = hydrated.id
+          if (!assignedId || usedIds.has(assignedId)) {
+            assignedId = nextId++
+          } else if (assignedId >= nextId) {
+            nextId = assignedId + 1
+          }
+          usedIds.add(assignedId)
+          inMemoryInfluencers.unshift({
+            ...hydrated,
+            id: assignedId,
+          })
+        }
+      }
+    }
+
+    const [pubRes, metaRes] = await Promise.all([
+      supabase.from('publicidades').select('*').order('id', { ascending: false }).limit(1000),
+      supabase.from('metas').select('*').order('id', { ascending: false }).limit(1000),
+    ])
+
+    if (!pubRes.error && Array.isArray(pubRes.data)) {
+      supabaseTables.publicidades = true
+      if (pubRes.data.length > 0) {
+        inMemoryPublicidades = pubRes.data
+        const maxPubId = pubRes.data.reduce((m, r) => Math.max(m, r.id || 0), 0)
+        nextPublicidadeId = Math.max(nextPublicidadeId, maxPubId + 1)
+      }
+    } else if (pubRes.error) {
+      supabaseTables.publicidades = false
+    }
+
+    if (!metaRes.error && Array.isArray(metaRes.data)) {
+      supabaseTables.metas = true
+      if (metaRes.data.length > 0) {
+        inMemoryMetas = metaRes.data
+        const maxMetaId = metaRes.data.reduce((m, r) => Math.max(m, r.id || 0), 0)
+        nextMetaId = Math.max(nextMetaId, maxMetaId + 1)
+      }
+    } else if (metaRes.error && !warnedMissingTables) {
+      supabaseTables.metas = false
+      warnedMissingTables = true
+      console.info('[Supabase] Tabelas extras (publicidades/metas) ainda não executadas no SQL Editor; operando em modo híbrido seguro.')
+    }
+  } catch (err) {
+    console.warn('[Supabase hydrate warning]', err.message)
+  } finally {
+    hasHydrated = true
+  }
+}
+
+async function ensureInitialized() {
+  if (hasHydrated && process.env.SKIP_SUPABASE_WRITE !== 'true') return
+  if (process.env.SKIP_SUPABASE_WRITE === 'true') {
+    hasHydrated = true
+    return
+  }
+  if (!initPromise) {
+    initPromise = hydrateFromSupabase().finally(() => {
+      initPromise = null
+    })
+  }
+  await initPromise
+}
 
 const store = {
   isUsingSupabase() {
     return !!supabase
+  },
+
+  async ensureInitialized() {
+    return ensureInitialized()
+  },
+
+  getSupabaseStatus() {
+    return {
+      configured: !!supabase,
+      hydrated: hasHydrated,
+      tables: { ...supabaseTables },
+      missingColumns: Array.from(missingInfluencerColumns),
+    }
   },
 
   async checkSupabaseHealth() {
@@ -79,6 +396,7 @@ const store = {
         configured: true,
         online: true,
         count: result.count || 0,
+        tables: { ...supabaseTables },
         latencyMs,
         lastPingAt,
       }
@@ -103,6 +421,7 @@ const store = {
 
   // --- CAPTAÇÃO & DASHBOARD GERAL ---
   async getStats() {
+    await ensureInitialized()
     const total = inMemoryInfluencers.length
     const qualified = inMemoryInfluencers.filter(i => i.classification === 'OURO' || i.classification === 'PRATA').length
     const whatsapps = inMemoryInfluencers.filter(i => i.whatsapp).length
@@ -128,11 +447,20 @@ const store = {
     let sentWaitingCount = 0
     let repliedCount = 0
     let missingDataCount = 0
+    let minedCount = 0
+    let minedAwaitingCount = 0
+    let minedMovedCount = 0
 
     for (const inf of inMemoryInfluencers) {
       const s = (inf.status || 'Novo').trim()
       if (statusCounts[s] !== undefined) {
         statusCounts[s]++
+      }
+
+      if (isMinedLead(inf)) {
+        minedCount++
+        if (s === 'Novo' || !s) minedAwaitingCount++
+        else minedMovedCount++
       }
 
       if (s === 'Novo' || !s) {
@@ -172,6 +500,9 @@ const store = {
       repliedCount,
       responseRate,
       missingDataCount,
+      minedCount,
+      minedAwaitingCount,
+      minedMovedCount,
       channelCounts,
       statusCounts,
       publicidadesSummary: {
@@ -185,6 +516,7 @@ const store = {
   },
 
   async listInfluencers({ search, status, stage, channel, classification, minFollowers, hideAgencies, onlyMined, sortBy = 'recent', page = 1, limit = 20 }) {
+    await ensureInitialized()
     const pageNum = Math.max(1, parseInt(page) || 1)
     const limitNum = Math.min(Math.max(1, parseInt(limit) || 20), 250)
     const offset = (pageNum - 1) * limitNum
@@ -208,6 +540,8 @@ const store = {
       filtered = filtered.filter(i => (i.status || 'Novo') === 'Novo')
     } else if (stage === 'sent') {
       filtered = filtered.filter(i => (i.status || 'Novo') !== 'Novo')
+    } else if (stage === 'mined') {
+      filtered = filtered.filter(i => isMinedLead(i))
     }
 
     if (channel) {
@@ -273,6 +607,7 @@ const store = {
   },
 
   async createInfluencer(body) {
+    await ensureInitialized()
     const username = (body.username || '').toLowerCase().replace(/^@+/, '').trim()
     const existingIndex = inMemoryInfluencers.findIndex(i => i.username === username)
 
@@ -282,6 +617,7 @@ const store = {
     }
 
     const { score, classification } = calculateScore(body)
+    const now = new Date().toISOString()
     const newRecord = {
       id: nextId++,
       ...body,
@@ -293,15 +629,17 @@ const store = {
       user_notes: body.user_notes || '',
       is_ghost: !!body.is_ghost,
       campaign_game: normalizeGame(body.campaign_game),
-      created_at: new Date().toISOString(),
+      created_at: body.created_at || now,
     }
 
     inMemoryInfluencers.unshift(newRecord)
+    await persistInfluencerToSupabase(newRecord)
     return newRecord
   },
 
   async updateInfluencer(id, body) {
-    const index = inMemoryInfluencers.findIndex(i => String(i.id) === String(id) || i.username === String(id))
+    await ensureInitialized()
+    const index = inMemoryInfluencers.findIndex(i => String(i.id) === String(id) || i.username === String(id).toLowerCase())
     if (index === -1) return null
 
     const current = inMemoryInfluencers[index]
@@ -340,16 +678,21 @@ const store = {
       contacted_at: contactedAt,
       last_contact_at: lastContactAt,
     }
+    await persistInfluencerToSupabase(inMemoryInfluencers[index])
     return inMemoryInfluencers[index]
   },
 
   async deleteInfluencer(id) {
-    const initialLength = inMemoryInfluencers.length
-    inMemoryInfluencers = inMemoryInfluencers.filter(i => String(i.id) !== String(id))
-    return inMemoryInfluencers.length < initialLength
+    await ensureInitialized()
+    const target = inMemoryInfluencers.find(i => String(i.id) === String(id) || i.username === String(id).toLowerCase())
+    if (!target) return false
+    inMemoryInfluencers = inMemoryInfluencers.filter(i => i !== target)
+    await deleteInfluencerFromSupabase(target.username)
+    return true
   },
 
   async upsertInfluencer(item) {
+    await ensureInitialized()
     const username = (item.username || '').toLowerCase().replace(/^@+/, '').trim()
     if (!username) return false
 
@@ -371,10 +714,11 @@ const store = {
         last_contact_at: existing.last_contact_at || item.last_contact_at || null,
         paid_amount: existing.paid_amount || item.paid_amount || 0,
         revenue_generated: existing.revenue_generated || item.revenue_generated || 0,
-        last_mined_at: item.last_mined_at || now,
+        last_mined_at: item.last_mined_at || (item.source_query ? now : existing.last_mined_at || null),
         created_at: existing.created_at || now,
       }
       inMemoryInfluencers[existingIndex] = updatedRecord
+      await persistInfluencerToSupabase(updatedRecord)
       return { action: 'updated', record: updatedRecord }
     } else {
       const newRecord = {
@@ -387,6 +731,7 @@ const store = {
         username,
       }
       inMemoryInfluencers.unshift(newRecord)
+      await persistInfluencerToSupabase(newRecord)
       return { action: 'inserted', record: newRecord }
     }
   },
@@ -408,6 +753,7 @@ const store = {
 
   // --- MÓDULO: PUBLICIDADES (CONTROLE FINANCEIRO) ---
   async listPublicidades({ influencer, game, closureType, deliveryStatus, paymentStatus, page = 1, limit = 50 } = {}) {
+    await ensureInitialized()
     let filtered = [...inMemoryPublicidades]
 
     if (influencer) {
@@ -451,6 +797,7 @@ const store = {
   },
 
   async getPublicidadesStats() {
+    await ensureInitialized()
     let totalInvested = 0
     let totalReturn = 0
     let totalCommissions = 0
@@ -497,6 +844,7 @@ const store = {
   },
 
   async createPublicidade(body) {
+    await ensureInitialized()
     const invested = parseFloat(body.invested_amount) || 0
     const commission = parseFloat(body.referral_commission) || 0
     const totalCost = invested + commission
@@ -528,6 +876,8 @@ const store = {
     }
 
     inMemoryPublicidades.unshift(newAd)
+    const savedPub = await persistPublicidadeToSupabase(newAd)
+    if (savedPub?.id) newAd.id = savedPub.id
 
     // Se for por meta de depositantes, já cria a meta vinculada automaticamente
     if (newAd.closure_type === 'Por meta' && newAd.target_depositors > 0) {
@@ -547,6 +897,7 @@ const store = {
   },
 
   async updatePublicidade(id, body) {
+    await ensureInitialized()
     const index = inMemoryPublicidades.findIndex(p => String(p.id) === String(id))
     if (index === -1) return null
 
@@ -568,22 +919,33 @@ const store = {
       return_amount: returnVal,
       roi: roi,
     }
+    if (isSupabaseWriteEnabled() && supabaseTables.publicidades) {
+      const payload = { ...inMemoryPublicidades[index] }
+      delete payload.id
+      await supabase.from('publicidades').update(payload).eq('id', current.id).then(() => {}, () => {})
+    }
 
     return inMemoryPublicidades[index]
   },
 
   async deletePublicidade(id) {
+    await ensureInitialized()
     const len = inMemoryPublicidades.length
     inMemoryPublicidades = inMemoryPublicidades.filter(p => String(p.id) !== String(id))
+    if (inMemoryPublicidades.length < len && isSupabaseWriteEnabled() && supabaseTables.publicidades) {
+      await supabase.from('publicidades').delete().eq('id', id).then(() => {}, () => {})
+    }
     return inMemoryPublicidades.length < len
   },
 
   // --- MÓDULO: METAS DE DEPOSITANTES ---
   async listMetas() {
+    await ensureInitialized()
     return inMemoryMetas
   },
 
   async getMetasStats() {
+    await ensureInitialized()
     let totalTarget = 0
     let totalReached = 0
     let totalInvestedInMetas = 0
@@ -612,6 +974,7 @@ const store = {
   },
 
   async createMeta(body) {
+    await ensureInitialized()
     const target = parseInt(body.target_depositors) || 0
     const reached = parseInt(body.reached_depositors) || 0
     const invested = parseFloat(body.invested_amount) || 0
@@ -638,10 +1001,13 @@ const store = {
     }
 
     inMemoryMetas.unshift(newMeta)
+    const savedMeta = await persistMetaToSupabase(newMeta)
+    if (savedMeta?.id) newMeta.id = savedMeta.id
     return newMeta
   },
 
   async updateMeta(id, body) {
+    await ensureInitialized()
     const index = inMemoryMetas.findIndex(m => String(m.id) === String(id))
     if (index === -1) return null
 
@@ -665,11 +1031,17 @@ const store = {
       status: reached >= target && target > 0 ? 'Meta atingida' : (body.status || current.status),
       last_updated: new Date().toISOString().split('T')[0],
     }
+    if (isSupabaseWriteEnabled() && supabaseTables.metas) {
+      const payload = { ...inMemoryMetas[index] }
+      delete payload.id
+      await supabase.from('metas').update(payload).eq('id', current.id).then(() => {}, () => {})
+    }
 
     return inMemoryMetas[index]
   },
 
   async incrementMeta(id, incrementAmount = 1) {
+    await ensureInitialized()
     const index = inMemoryMetas.findIndex(m => String(m.id) === String(id))
     if (index === -1) return null
 
@@ -693,12 +1065,18 @@ const store = {
       last_updated: new Date().toISOString().split('T')[0],
       history,
     }
+    if (isSupabaseWriteEnabled() && supabaseTables.metas) {
+      const payload = { ...inMemoryMetas[index] }
+      delete payload.id
+      await supabase.from('metas').update(payload).eq('id', current.id).then(() => {}, () => {})
+    }
 
     return inMemoryMetas[index]
   },
 
   // --- PERFIL UNIFICADO DO INFLUENCIADOR ---
   async getInfluencerFullProfile(usernameOrId) {
+    await ensureInitialized()
     const cleanUsername = String(usernameOrId).toLowerCase().replace(/^@+/, '').trim()
     const inf = inMemoryInfluencers.find(i =>
       String(i.id) === cleanUsername || (i.username && i.username.toLowerCase() === cleanUsername)

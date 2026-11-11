@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 5 — Infraestrutura, Planilhas & Visual Jackpot
+ */
 import React, { useState } from 'react'
 import {
   Upload,

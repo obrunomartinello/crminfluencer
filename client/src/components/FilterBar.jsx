@@ -116,10 +116,10 @@ export default function FilterBar({
             }}
           >
             <option value="">Seguidores: Todos</option>
-            <option value="15000">🔥 15k+ (Ideal Pedro)</option>
-            <option value="30000">🚀 30k+</option>
-            <option value="50000">⭐ 50k+</option>
-            <option value="100000">👑 100k+</option>
+            <option value="15000">🔥 +15k seguidores (Ideal Pedro)</option>
+            <option value="30000">🚀 30k+ seguidores</option>
+            <option value="50000">⭐ 50k+ seguidores</option>
+            <option value="100000">👑 100k+ seguidores</option>
           </select>
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
             <ChevronDown size={14} />

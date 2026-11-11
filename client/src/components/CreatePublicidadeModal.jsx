@@ -1,28 +1,47 @@
+/**
+ * @pilar PILAR 4 — Financeiro: Publicidades & Metas
+ */
 import React, { useState } from 'react'
-import { X, DollarSign, Calendar, User, Gamepad2, Award, AlertCircle } from 'lucide-react'
+import { X, DollarSign, AlertCircle } from 'lucide-react'
 
 const GAMES = ['Block Win', 'Bubble Win', 'Cust Win', 'Count Masters']
+const getTodayISO = () => new Date().toISOString().split('T')[0]
 
 export default function CreatePublicidadeModal({ open, onClose, onCreated, initialData = {} }) {
+  if (!open) return null
+  const formKey = initialData?.id
+    ? `edit-${initialData.id}`
+    : `new-${initialData?.influencer_username || 'blank'}`
+  return (
+    <CreatePublicidadeModalForm
+      key={formKey}
+      onClose={onClose}
+      onCreated={onCreated}
+      initialData={initialData}
+    />
+  )
+}
+
+function CreatePublicidadeModalForm({ onClose, onCreated, initialData = {} }) {
   const [influencerUsername, setInfluencerUsername] = useState(initialData.influencer_username || '')
   const [influencerName, setInfluencerName] = useState(initialData.influencer_name || '')
   const [whatsapp, setWhatsapp] = useState(initialData.whatsapp || '')
   const [game, setGame] = useState(initialData.game || 'Block Win')
-  const [investedAmount, setInvestedAmount] = useState(initialData.invested_amount || '')
-  const [returnAmount, setReturnAmount] = useState(initialData.return_amount || '')
+  const [investedAmount, setInvestedAmount] = useState(initialData.invested_amount ?? '')
+  const [returnAmount, setReturnAmount] = useState(initialData.return_amount ?? '')
   const [closureType, setClosureType] = useState(initialData.closure_type || 'Fixo')
-  const [targetDepositors, setTargetDepositors] = useState(initialData.target_depositors || '')
-  const [startDate, setStartDate] = useState(initialData.start_date || new Date().toISOString().split('T')[0])
+  const [targetDepositors, setTargetDepositors] = useState(initialData.target_depositors ?? '')
+  const [startDate, setStartDate] = useState(initialData.start_date || getTodayISO())
   const [endDate, setEndDate] = useState(initialData.end_date || '')
   const [deliveryStatus, setDeliveryStatus] = useState(initialData.delivery_status || 'Agendada')
   const [paymentStatus, setPaymentStatus] = useState(initialData.payment_status || 'Pendente')
   const [referralName, setReferralName] = useState(initialData.referral_name || '')
-  const [referralCommission, setReferralCommission] = useState(initialData.referral_commission || '')
+  const [referralCommission, setReferralCommission] = useState(initialData.referral_commission ?? '')
   const [notes, setNotes] = useState(initialData.notes || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  if (!open) return null
+  const isEditing = Boolean(initialData?.id)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -83,7 +102,7 @@ export default function CreatePublicidadeModal({ open, onClose, onCreated, initi
           </div>
           <div>
             <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-              Registrar Publicidade
+              {isEditing ? 'Editar Publicidade' : 'Registrar Publicidade'}
             </h3>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Controle de contrato, investimento, retorno e ROI da campanha
@@ -397,7 +416,7 @@ export default function CreatePublicidadeModal({ open, onClose, onCreated, initi
               disabled={loading}
               className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
             >
-              {loading ? 'Salvando...' : 'Salvar Publicidade'}
+              {loading ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar Publicidade'}
             </button>
           </div>
         </form>

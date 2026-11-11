@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 5 — Infraestrutura, Planilhas & Visual Jackpot (Rotas /api/import)
+ */
 const express = require('express')
 const router = express.Router()
 const store = require('../db/store')

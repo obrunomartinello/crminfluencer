@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 5 — Infraestrutura, Keepalive, Planilhas & Visual Jackpot
+ */
 import React from 'react'
 import {
   ArrowRight,
@@ -196,22 +199,18 @@ export default function DashboardView({
           <button
             type="button"
             onClick={() => {
-              if (onToggleOnlyMined) onToggleOnlyMined(true)
-              onNavigateTab('kanban', { onlyMined: true })
+              if (onToggleOnlyMined) onToggleOnlyMined(false)
+              onNavigateTab('mined')
             }}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5 ${
-              onlyMinedFilter
-                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent shadow-sm'
-                : 'hover:bg-amber-500/10 hover:border-amber-500/30'
-            }`}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5 hover:bg-amber-500/10 hover:border-amber-500/30"
             style={{
-              backgroundColor: onlyMinedFilter ? undefined : 'var(--bg-card)',
-              borderColor: onlyMinedFilter ? undefined : 'var(--border-color)',
-              color: onlyMinedFilter ? undefined : 'var(--text-muted)',
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-primary)',
             }}
           >
             <span>💎</span>
-            <span>Ver Só Minerados</span>
+            <span>Ver Minerados ({stats?.minedCount ?? 0})</span>
           </button>
         </div>
 

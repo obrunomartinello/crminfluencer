@@ -4,6 +4,7 @@ const express = require('express')
 
 async function runV3WorkflowTests() {
   console.log('=== RED/GREEN TEST SUITE: Scout CRM v3.0 SDR Workflow ===\n')
+  process.env.SKIP_SUPABASE_WRITE = 'true'
 
   const store = require('../server/db/store')
   const app = express()

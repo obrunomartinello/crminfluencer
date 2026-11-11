@@ -286,8 +286,8 @@ export default function InfluencerTable({
                         {formatNum(inf.followers_count)}
                       </span>
                       {inf.followers_count >= 15000 && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25" title="Lead com audiência qualificada (+15k)">
-                          15k+
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25" title="Lead com audiência qualificada (+15k seguidores)">
+                          +15k seg.
                         </span>
                       )}
                     </div>

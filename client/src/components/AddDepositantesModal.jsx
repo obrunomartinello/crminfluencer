@@ -1,11 +1,17 @@
+/**
+ * @pilar PILAR 4 — Financeiro: Publicidades & Metas
+ */
 import React, { useState } from 'react'
 import { X, Plus, Target, CheckCircle2 } from 'lucide-react'
 
 export default function AddDepositantesModal({ open, onClose, meta, onIncrement }) {
+  if (!open || !meta) return null
+  return <AddDepositantesModalForm key={meta.id} onClose={onClose} meta={meta} onIncrement={onIncrement} />
+}
+
+function AddDepositantesModalForm({ onClose, meta, onIncrement }) {
   const [amount, setAmount] = useState('1')
   const [loading, setLoading] = useState(false)
-
-  if (!open || !meta) return null
 
   const handleSubmit = async (e) => {
     e.preventDefault()

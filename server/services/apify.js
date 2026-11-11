@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 2 — Motor de Busca, Apify & Score SDR
+ */
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') })
 
 const MOCK_INFLUENCERS = [

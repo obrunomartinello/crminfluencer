@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 4 — Financeiro: Publicidades & Metas
+ */
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   Target,

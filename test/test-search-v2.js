@@ -71,6 +71,7 @@ async function runSearchV2Tests() {
   console.log('✅ 3. Stateless job token encode/decode passed')
 
   // 4. Test store.listInfluencers sorting (recent puts new mined leads on Page 1) & extended search
+  process.env.SKIP_SUPABASE_WRITE = 'true'
   const store = require('../server/db/store')
   const testUsername = `criador_novo_teste_${Date.now()}`
   await store.upsertInfluencer({

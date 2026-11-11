@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 2 — Motor de Busca, Apify & Score SDR (Rotas /api/mine)
+ */
 const express = require('express')
 const router = express.Router()
 const store = require('../db/store')
@@ -229,6 +232,7 @@ router.get('/status/:jobId', async (req, res) => {
       }
 
       // Fase 1 SUCCEEDED: extrair @usernames e priorizar quem ainda NÃO está no CRM
+      await store.ensureInitialized()
       const excludeSet = skipExisting ? store.getAllUsernames() : new Set()
       const { allUsernames, freshUsernames, metaByUsername } = extractCreatorsFromSearchItems(
         check.items,

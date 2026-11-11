@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 2 — Motor de Busca, Apify & Score SDR (Termômetro de Cota)
+ */
 import React from 'react'
 import { Flame, RefreshCw, AlertTriangle, CheckCircle2, Thermometer } from 'lucide-react'
 

@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 1 — Banco de Dados & Persistência Supabase (Rotas /api/influencers)
+ */
 const express = require('express')
 const router = express.Router()
 const store = require('../db/store')

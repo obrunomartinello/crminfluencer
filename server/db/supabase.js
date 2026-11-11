@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 1 — Banco de Dados & Persistência Supabase
+ */
 const { createClient } = require('@supabase/supabase-js')
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') })
 

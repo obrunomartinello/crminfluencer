@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 3 — Funil SDR: Minerados, Kanban & Ficha (Painel Já Mandados)
+ */
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   RefreshCw,

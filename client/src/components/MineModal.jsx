@@ -1,3 +1,6 @@
+/**
+ * @pilar PILAR 2 — Motor de Busca, Apify & Score SDR
+ */
 import React, { useState, useEffect, useRef } from 'react'
 import {
   X,
@@ -367,7 +370,7 @@ export default function MineModal({
                           @{c.username}
                         </span>
                         <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {formatNum(c.followers_count)} seg • {formatNum(c.avg_reels_views)} views
+                          {formatNum(c.followers_count)} seguidores • {formatNum(c.avg_reels_views)} views
                         </span>
                       </div>
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">
