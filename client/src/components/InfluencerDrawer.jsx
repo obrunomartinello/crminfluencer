@@ -6,6 +6,7 @@ import {
   X,
   ExternalLink,
   Phone,
+  Mail,
   Copy,
   Check,
   Sparkles,
@@ -18,16 +19,25 @@ import {
   CheckCircle2,
   MessageCircle,
   AtSign,
+  RefreshCw,
 } from 'lucide-react'
 import { api } from '../lib/api'
+import { cleanInstagramHandle, getInstagramProfileUrl, formatFollowersLabel } from '../lib/instagram'
 import { PEDRO_STATUSES } from '../constants/nichePresets'
 
 const GAMES = ['Block Win', 'Bubble Win', 'Cust Win', 'Count Masters']
 
-export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCreatePublicidadeForInfluencer }) {
+export default function InfluencerDrawer({
+  influencer,
+  onClose,
+  onUpdate,
+  onInfluencerSynced,
+  onCreatePublicidadeForInfluencer,
+}) {
   const [status, setStatus] = useState('Novo')
   const [outreachChannel, setOutreachChannel] = useState('')
   const [customPhone, setCustomPhone] = useState('')
+  const [customEmail, setCustomEmail] = useState('')
   const [campaignGame, setCampaignGame] = useState('')
   const [storyViewsAvg, setStoryViewsAvg] = useState('')
   const [storyClicksAvg, setStoryClicksAvg] = useState('')
@@ -39,6 +49,8 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
   const [savingForm, setSavingForm] = useState(false)
   const [savedFeedback, setSavedFeedback] = useState(false)
   const [isGhost, setIsGhost] = useState(false)
+  const [enriching, setEnriching] = useState(false)
+  const [enrichFeedback, setEnrichFeedback] = useState(null)
 
   // Dados unificados carregados da API
   const [fullProfile, setFullProfile] = useState(null)
@@ -48,6 +60,7 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
       setStatus(influencer.status || 'Novo')
       setOutreachChannel(influencer.outreach_channel || '')
       setCustomPhone(influencer.whatsapp || '')
+      setCustomEmail(influencer.email || '')
       setCampaignGame(influencer.campaign_game || '')
       setStoryViewsAvg(influencer.story_views_avg ? String(influencer.story_views_avg) : '')
       setStoryClicksAvg(influencer.story_clicks_avg ? String(influencer.story_clicks_avg) : '')
@@ -55,6 +68,7 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
       setNotes(influencer.user_notes || '')
       setIsGhost(!!influencer.is_ghost || influencer.user_notes?.toLowerCase().includes('ghost'))
       setSavedFeedback(false)
+      setEnrichFeedback(null)
 
       api.getInfluencerFullProfile(influencer.username)
         .then((res) => setFullProfile(res))
@@ -103,6 +117,7 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
         status,
         outreach_channel: outreachChannel || null,
         whatsapp: cleanPhone || null,
+        email: customEmail.trim().toLowerCase() || null,
         campaign_game: campaignGame || null,
         story_views_avg: storyViewsAvg === '' ? 0 : parseInt(storyViewsAvg, 10) || 0,
         story_clicks_avg: storyClicksAvg === '' ? 0 : parseInt(storyClicksAvg, 10) || 0,
@@ -127,11 +142,38 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
         status: nextStatus,
         outreach_channel: channel,
         whatsapp: cleanPhone || null,
+        email: customEmail.trim().toLowerCase() || null,
       })
       setSavedFeedback(true)
       setTimeout(() => setSavedFeedback(false), 2500)
     } finally {
       setSavingForm(false)
+    }
+  }
+
+  const handleEnrichIG = async () => {
+    if (!influencer?.id || enriching) return
+    setEnriching(true)
+    setEnrichFeedback(null)
+    try {
+      const res = await api.enrichInfluencer(influencer.id)
+      const updated = res?.data
+      if (updated) {
+        if (updated.whatsapp && !customPhone) setCustomPhone(updated.whatsapp)
+        if (updated.email && !customEmail) setCustomEmail(updated.email)
+        if (onInfluencerSynced) onInfluencerSynced(updated)
+      }
+      setEnrichFeedback({
+        type: res?.notFound ? 'warn' : 'success',
+        text: res?.message || 'Perfil atualizado com dados do Instagram.',
+      })
+    } catch (err) {
+      setEnrichFeedback({
+        type: 'error',
+        text: err.message || 'Erro ao buscar perfil no Apify.',
+      })
+    } finally {
+      setEnriching(false)
     }
   }
 
@@ -204,15 +246,21 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
                   </span>
                 )}
               </div>
-              <a
-                href={`https://instagram.com/${influencer.username}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-blue-500 hover:underline inline-flex items-center gap-1"
-              >
-                @{influencer.username}
-                <ExternalLink size={11} />
-              </a>
+              {getInstagramProfileUrl(influencer.username) ? (
+                <a
+                  href={getInstagramProfileUrl(influencer.username)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-blue-500 hover:underline inline-flex items-center gap-1"
+                >
+                  @{cleanInstagramHandle(influencer.username)}
+                  <ExternalLink size={11} />
+                </a>
+              ) : (
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  @{influencer.username}
+                </span>
+              )}
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                   {status}
@@ -227,6 +275,11 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
                     Mandado em {contactedDateLabel}
                   </span>
                 )}
+                {influencer.ig_not_found && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                    ⚠️ @ não encontrado no IG
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -239,19 +292,42 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
           </button>
         </div>
 
-        {/* Barra de Contato Rápido & Ações Imediatas */}
+        {/* Barra de Contato Rápido & Enriquecimento Real IG */}
         <div
           className="px-5 py-2.5 border-b flex flex-wrap items-center justify-between gap-2 text-xs shrink-0"
           style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
         >
-          <div className="flex items-center gap-2">
-            <Phone size={14} className="text-emerald-500 shrink-0" />
-            <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
-              {formattedPhone || 'Sem WhatsApp cadastrado'}
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Phone size={13} className="text-emerald-500 shrink-0" />
+              <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
+                {formattedPhone || 'Sem WhatsApp'}
+              </span>
+            </div>
+            {customEmail && (
+              <a
+                href={`mailto:${customEmail}`}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-600 dark:text-sky-400 hover:underline max-w-[190px] truncate"
+                title={customEmail}
+              >
+                <Mail size={12} className="shrink-0" />
+                <span className="truncate">{customEmail}</span>
+              </a>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleEnrichIG}
+              disabled={enriching}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold border border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 disabled:opacity-60 transition-all"
+              title="Puxar seguidores reais, bio, WhatsApp e e-mail do Instagram via Apify"
+            >
+              <RefreshCw size={11} className={enriching ? 'animate-spin' : ''} />
+              <span>{enriching ? 'Consultando IG...' : 'Atualizar IG'}</span>
+            </button>
+
             {cleanPhone && (
               <a
                 href={`https://wa.me/${intlPhone}?text=${encodeURIComponent(currentMessage)}`}
@@ -336,6 +412,22 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
 
         {/* Drawer Body Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+          {(enrichFeedback || influencer.ig_not_found) && (
+            <div
+              className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
+                enrichFeedback?.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
+              }`}
+            >
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <span>
+                {enrichFeedback?.text
+                  || `Atenção: @${cleanInstagramHandle(influencer.username) || influencer.username} retornou perfil inexistente ou restrito no Instagram. Confirme o arroba antes de abordar.`}
+              </span>
+            </div>
+          )}
+
           {/* TAB 1: FICHA & PREENCHIMENTO SDR */}
           {drawerTab === 'resumo' && (
             <form onSubmit={handleSaveAll} className="space-y-4">
@@ -449,6 +541,24 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
 
                   <div>
                     <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                      E-mail (contato p/ parceria)
+                    </label>
+                    <input
+                      type="email"
+                      value={customEmail}
+                      onChange={(e) => setCustomEmail(e.target.value)}
+                      placeholder="Ex: contato@criador.com"
+                      className="w-full px-3 py-2 border rounded-xl text-xs"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
                       Jogo da Campanha
                     </label>
                     <select
@@ -549,7 +659,8 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
 
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {formatNum(influencer.followers_count)} seguidores • {formatNum(influencer.avg_reels_views)} views Reels
+                    {formatFollowersLabel(influencer.followers_count, false)}
+                    {influencer.avg_reels_views > 0 ? ` • ${formatNum(influencer.avg_reels_views)} views Reels` : ''}
                   </span>
                   <button
                     type="submit"

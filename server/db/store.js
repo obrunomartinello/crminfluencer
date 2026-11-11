@@ -13,16 +13,22 @@ const SEED_USERNAMES = new Set(
   seed.influencers.map(i => (i.username || '').toLowerCase().replace(/^@+/, '').trim()).filter(Boolean)
 )
 
-let inMemoryInfluencers = seed.influencers.map((inf, index) => {
-  const { score, classification } = calculateScore(inf)
+function mapSeedInfluencer(inf, index) {
+  const followers = parseInt(inf.followers_count, 10) || 0
+  const reelsViews = parseInt(inf.avg_reels_views, 10) || 0
+  const hasRealMetrics = followers > 0 || reelsViews > 0
+  const calculated = hasRealMetrics ? calculateScore(inf) : { score: 0, classification: null }
   const seedDate = inf.contact_date && inf.contact_date < '2026-11-07'
     ? `${inf.contact_date}T12:00:00.000Z`
     : '2026-11-05T12:00:00.000Z'
   return {
     id: index + 1,
     ...inf,
-    score: inf.score || score,
-    classification: inf.classification || classification,
+    followers_count: followers,
+    score: inf.score || calculated.score || 0,
+    classification: inf.classification || calculated.classification || null,
+    email: inf.email || null,
+    ig_not_found: Boolean(inf.ig_not_found),
     status: inf.status || 'Novo',
     user_notes: inf.user_notes || '',
     story_views_avg: 0,
@@ -41,7 +47,9 @@ let inMemoryInfluencers = seed.influencers.map((inf, index) => {
     source_query: null,
     created_at: seedDate,
   }
-})
+}
+
+let inMemoryInfluencers = seed.influencers.map(mapSeedInfluencer)
 
 let inMemoryPublicidades = [...seed.publicidades]
 let inMemoryMetas = [...seed.metas]
@@ -61,7 +69,7 @@ const SUPABASE_INFLUENCER_COLUMNS = [
   'roi_verdict', 'is_agency', 'promotes_raffle', 'promotes_shopee',
   'created_at', 'paid_amount', 'revenue_generated', 'last_campaign_date',
   'outreach_channel', 'contacted_at', 'last_contact_at', 'last_mined_at',
-  'source_query', 'is_ghost', 'campaign_game',
+  'source_query', 'is_ghost', 'campaign_game', 'ig_not_found',
 ]
 
 const EXTRA_META_FIELDS = [
@@ -72,6 +80,7 @@ const EXTRA_META_FIELDS = [
   'source_query',
   'is_ghost',
   'campaign_game',
+  'ig_not_found',
 ]
 
 const missingInfluencerColumns = new Set()
@@ -96,6 +105,23 @@ function isMinedLead(inf) {
 function normalizeNullableDate(val) {
   if (val === undefined || val === null || val === '') return null
   return val
+}
+
+const RESERVED_IG_PATHS = new Set(['p', 'reel', 'reels', 'stories', 'explore', 'popular', 'accounts', 'direct'])
+
+/** Normaliza @username ou URL colada do Instagram em handle limpo sem @ ou barras. */
+function normalizeHandleInput(raw) {
+  let clean = String(raw || '').trim().toLowerCase()
+  if (!clean) return ''
+  clean = clean
+    .replace(/^https?:\/\/(www\.|m\.)?instagram\.com\//i, '')
+    .replace(/^(www\.|m\.)?instagram\.com\//i, '')
+    .split(/[?#]/)[0]
+    .replace(/^@+/, '')
+    .replace(/^\/+|\/+$/g, '')
+  const firstSegment = (clean.split('/')[0] || '').replace(/^@+/, '').replace(/\s+/g, '')
+  if (!firstSegment || RESERVED_IG_PATHS.has(firstSegment)) return ''
+  return firstSegment
 }
 
 function unpackUserNotes(rawNotes) {
@@ -134,7 +160,7 @@ function buildInfluencerSupabasePayload(record) {
       payload[col] = parseInt(record[col], 10) || 0
     } else if (['engagement_rate', 'score', 'story_asking_price', 'estimated_revenue', 'paid_amount', 'revenue_generated'].includes(col)) {
       payload[col] = parseFloat(record[col]) || 0
-    } else if (['has_competitor', 'is_agency', 'promotes_raffle', 'promotes_shopee', 'is_ghost'].includes(col)) {
+    } else if (['has_competitor', 'is_agency', 'promotes_raffle', 'promotes_shopee', 'is_ghost', 'ig_not_found'].includes(col)) {
       payload[col] = Boolean(record[col])
     } else if (['created_at', 'last_campaign_date', 'contacted_at', 'last_contact_at', 'last_mined_at'].includes(col)) {
       payload[col] = normalizeNullableDate(record[col])
@@ -245,10 +271,25 @@ function hydrateInfluencerRow(row) {
     username,
     user_notes: cleanNotes,
     status: row.status || meta.status || 'Novo',
+    email: row.email || meta.email || null,
+    ig_not_found: Boolean(row.ig_not_found || meta.ig_not_found),
     score: row.score || 0,
+    classification: row.classification || null,
     story_views_avg: row.story_views_avg || 0,
     story_clicks_avg: row.story_clicks_avg || 0,
     story_asking_price: row.story_asking_price || 0,
+  }
+  // Evita exibir seguidores/score fictícios (25k/35k) de sementes antigas sem enriquecimento real
+  if (
+    SEED_USERNAMES.has(username)
+    && !merged.bio
+    && !merged.profile_pic_url
+    && !(merged.avg_reels_views > 0)
+    && (merged.followers_count === 25000 || merged.followers_count === 35000)
+  ) {
+    merged.followers_count = 0
+    merged.score = 0
+    merged.classification = null
   }
   // Leads salvos no Supabase fora da planilha inicial do Pedro vieram de mineração/cadastro dinâmico
   if (!SEED_USERNAMES.has(username) && !merged.last_mined_at && !merged.source_query) {
@@ -277,7 +318,7 @@ async function hydrateFromSupabase() {
 
       for (const rawRow of rows) {
         const hydrated = hydrateInfluencerRow(rawRow)
-        if (!hydrated.username) continue
+        if (!hydrated.username || hydrated.username === 'samuraii_da_resenha') continue
         if (rawRow.id) supabaseIdMap.set(hydrated.username, rawRow.id)
 
         const existingIdx = inMemoryInfluencers.findIndex(
@@ -290,6 +331,9 @@ async function hydrateFromSupabase() {
             ...existing,
             ...hydrated,
             id: existing.id,
+            ig_not_found: hydrated.followers_count > 0 && hydrated.bio
+              ? false
+              : (hydrated.ig_not_found || existing.ig_not_found || false),
             last_mined_at: hydrated.last_mined_at || existing.last_mined_at || null,
             source_query: hydrated.source_query || existing.source_query || null,
           }
@@ -414,6 +458,8 @@ const store = {
   listGames() {
     return GAMES
   },
+
+  normalizeHandleInput,
 
   getAllUsernames() {
     return new Set(inMemoryInfluencers.map(i => (i.username || '').toLowerCase()).filter(Boolean))
@@ -606,9 +652,18 @@ const store = {
     }
   },
 
+  async getInfluencer(id) {
+    await ensureInitialized()
+    const cleanTarget = normalizeHandleInput(id) || String(id || '').toLowerCase()
+    return inMemoryInfluencers.find(
+      i => String(i.id) === String(id) || i.username === cleanTarget || i.username === String(id).toLowerCase()
+    ) || null
+  },
+
   async createInfluencer(body) {
     await ensureInitialized()
-    const username = (body.username || '').toLowerCase().replace(/^@+/, '').trim()
+    const username = normalizeHandleInput(body.username)
+    if (!username) return null
     const existingIndex = inMemoryInfluencers.findIndex(i => i.username === username)
 
     if (existingIndex !== -1) {
@@ -616,15 +671,22 @@ const store = {
       return inMemoryInfluencers[existingIndex]
     }
 
-    const { score, classification } = calculateScore(body)
+    const followers = parseInt(body.followers_count, 10) || 0
+    const reelsViews = parseInt(body.avg_reels_views, 10) || 0
+    const hasMetrics = followers > 0 || reelsViews > 0
+    const calculated = hasMetrics ? calculateScore(body) : { score: 0, classification: null }
     const now = new Date().toISOString()
     const newRecord = {
       id: nextId++,
       ...body,
       username,
       full_name: body.full_name || username,
-      score,
-      classification,
+      followers_count: followers,
+      avg_reels_views: reelsViews,
+      email: body.email ? String(body.email).trim().toLowerCase() : null,
+      ig_not_found: Boolean(body.ig_not_found),
+      score: body.score ?? calculated.score ?? 0,
+      classification: body.classification !== undefined ? body.classification : (calculated.classification || null),
       status: body.status || 'Novo',
       user_notes: body.user_notes || '',
       is_ghost: !!body.is_ghost,
@@ -659,6 +721,23 @@ const store = {
     }
 
     const sanitized = { ...body }
+    if (sanitized.username !== undefined) {
+      const cleanedHandle = normalizeHandleInput(sanitized.username)
+      if (cleanedHandle) sanitized.username = cleanedHandle
+      else delete sanitized.username
+    }
+    if (sanitized.email !== undefined) {
+      sanitized.email = sanitized.email ? String(sanitized.email).trim().toLowerCase() : null
+    }
+    if (sanitized.ig_not_found !== undefined) {
+      sanitized.ig_not_found = Boolean(sanitized.ig_not_found)
+    }
+    if (sanitized.followers_count !== undefined) {
+      sanitized.followers_count = parseInt(sanitized.followers_count, 10) || 0
+    }
+    if (sanitized.avg_reels_views !== undefined) {
+      sanitized.avg_reels_views = parseInt(sanitized.avg_reels_views, 10) || 0
+    }
     if (sanitized.story_views_avg !== undefined) {
       sanitized.story_views_avg = parseInt(sanitized.story_views_avg, 10) || 0
     }
@@ -693,7 +772,7 @@ const store = {
 
   async upsertInfluencer(item) {
     await ensureInitialized()
-    const username = (item.username || '').toLowerCase().replace(/^@+/, '').trim()
+    const username = normalizeHandleInput(item.username)
     if (!username) return false
 
     const now = new Date().toISOString()
@@ -705,6 +784,9 @@ const store = {
         ...existing,
         ...item,
         username,
+        whatsapp: item.whatsapp || existing.whatsapp || null,
+        email: item.email || existing.email || null,
+        ig_not_found: item.ig_not_found !== undefined ? Boolean(item.ig_not_found) : Boolean(existing.ig_not_found),
         // Preserva histórico comercial do Pedro caso o lead já exista no CRM
         status: existing.status && existing.status !== 'Novo' ? existing.status : (item.status || existing.status || 'Novo'),
         user_notes: existing.user_notes || item.user_notes || '',
@@ -1130,7 +1212,7 @@ const store = {
   // Reseta para dados limpos originais do Pedro caso o usuário solicite
   resetToPedroSeed() {
     const fresh = buildInitialDatabase()
-    inMemoryInfluencers = fresh.influencers.map((inf, idx) => ({ id: idx + 1, ...inf }))
+    inMemoryInfluencers = fresh.influencers.map(mapSeedInfluencer)
     inMemoryPublicidades = [...fresh.publicidades]
     inMemoryMetas = [...fresh.metas]
     return {

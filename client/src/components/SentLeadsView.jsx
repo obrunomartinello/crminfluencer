@@ -11,6 +11,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { api } from '../lib/api'
+import { cleanInstagramHandle, getInstagramProfileUrl } from '../lib/instagram'
 import { PEDRO_STATUSES } from '../constants/nichePresets'
 
 function formatSentDate(iso) {
@@ -331,15 +332,21 @@ export default function SentLeadsView({
                         <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {inf.full_name || inf.username}
                         </div>
-                        <a
-                          href={`https://instagram.com/${inf.username}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-[11px] text-blue-500 hover:underline inline-flex items-center gap-0.5"
-                        >
-                          @{inf.username} <ExternalLink size={9} />
-                        </a>
+                        {getInstagramProfileUrl(inf.username) ? (
+                          <a
+                            href={getInstagramProfileUrl(inf.username)}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] text-blue-500 hover:underline inline-flex items-center gap-0.5"
+                          >
+                            @{cleanInstagramHandle(inf.username)} <ExternalLink size={9} />
+                          </a>
+                        ) : (
+                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                            @{inf.username}
+                          </span>
+                        )}
                       </td>
 
                       <td className="py-3 px-3 whitespace-nowrap">

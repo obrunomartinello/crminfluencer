@@ -2,6 +2,7 @@
  * @pilar PILAR 2 — Motor de Busca, Apify & Score SDR
  */
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') })
+const { extractEmail, fastInspectBio, inspectLink } = require('./linktree')
 
 const MOCK_INFLUENCERS = [
   {
@@ -121,6 +122,15 @@ function buildSearchInput(query, count = 25, mode = 'popular') {
       searchType: 'user',
       searchLimit: limit,
       liveSearch: true,
+    }
+  }
+
+  if (mode === 'hashtag') {
+    const hashtag = cleanQuery.replace(/[\s#]+/g, '')
+    return {
+      search: hashtag,
+      searchType: 'hashtag',
+      searchLimit: limit,
     }
   }
 
@@ -292,6 +302,9 @@ function mapProfileResult(item, stage1Meta = null) {
     ? item.businessCategoryName
     : 'Criador'
 
+  const rawEmail = item.businessEmail || item.publicEmail || item.email || extractEmail(bio) || extractEmail(primaryExternalUrl) || null
+  const email = rawEmail ? String(rawEmail).toLowerCase().trim() : null
+
   return {
     username,
     full_name: item.fullName || item.ownerFullName || item.full_name || stage1Meta?.fullName || username,
@@ -304,6 +317,7 @@ function mapProfileResult(item, stage1Meta = null) {
     avg_reels_views: avgReelsViews,
     engagement_rate: engagementRate,
     whatsapp: directWhatsApp,
+    email,
     niche: category,
     is_agency: !!isAgency,
     promotes_raffle: !!promotesRaffle,
@@ -334,19 +348,23 @@ async function startAsyncSearch(query, count = 25, options = {}) {
   const client = new ApifyClient({ token: process.env.APIFY_TOKEN })
   const mode = options.mode || 'popular'
   const limit = Math.min(Math.max(parseInt(count) || 25, 5), 50)
+  const cleanQuery = String(query || '').replace(/^[@#]+/, '').trim()
+  const hasSpaces = /\s/.test(cleanQuery)
+  // Queries multi-palavras falham em /popular/word-word (no_items); hashtag concatenada evita desperdiçar busca
+  const contentMode = hasSpaces ? 'hashtag' : 'popular'
 
-  console.log(`[apify] Fase 1 (${mode}) para "${query}" (searchLimit: ${limit})`)
+  console.log(`[apify] Fase 1 (${mode}${hasSpaces && mode !== 'user' ? ` -> ${contentMode}` : ''}) para "${query}" (searchLimit: ${limit})`)
 
   if (mode === 'hybrid') {
     const [popularRun, userRun] = await Promise.all([
-      client.actor('apify/instagram-search-scraper').start(buildSearchInput(query, limit, 'popular')),
+      client.actor('apify/instagram-search-scraper').start(buildSearchInput(query, limit, contentMode)),
       client.actor('apify/instagram-search-scraper').start(buildSearchInput(query, Math.min(limit, 20), 'user')),
     ])
     return {
       runId: popularRun.id,
       defaultDatasetId: popularRun.defaultDatasetId,
       runs: [
-        { id: popularRun.id, ds: popularRun.defaultDatasetId, mode: 'popular' },
+        { id: popularRun.id, ds: popularRun.defaultDatasetId, mode: contentMode },
         { id: userRun.id, ds: userRun.defaultDatasetId, mode: 'user' },
       ],
       status: 'RUNNING',
@@ -354,11 +372,12 @@ async function startAsyncSearch(query, count = 25, options = {}) {
     }
   }
 
-  const run = await client.actor('apify/instagram-search-scraper').start(buildSearchInput(query, limit, mode))
+  const effectiveMode = mode === 'popular' ? contentMode : mode
+  const run = await client.actor('apify/instagram-search-scraper').start(buildSearchInput(query, limit, effectiveMode))
   return {
     runId: run.id,
     defaultDatasetId: run.defaultDatasetId,
-    runs: [{ id: run.id, ds: run.defaultDatasetId, mode }],
+    runs: [{ id: run.id, ds: run.defaultDatasetId, mode: effectiveMode }],
     status: run.status,
     isMock: false,
   }
@@ -457,13 +476,19 @@ async function checkActorRun(runId, defaultDatasetId, metaByUsername = {}) {
   if (run.status === 'SUCCEEDED') {
     const datasetId = defaultDatasetId || run.defaultDatasetId
     const dataset = await client.dataset(datasetId).listItems()
-    const profiles = dataset.items
+    const rawItems = dataset.items || []
+    const validItems = rawItems.filter(item => item && !item.error)
+    const skippedErrors = rawItems.length - validItems.length
+    if (skippedErrors > 0) {
+      console.warn(`[apify] ${skippedErrors} perfil(is) retornaram error/not_found no Apify e foram ignorados`)
+    }
+    const profiles = validItems
       .map(item => {
         const u = normalizeHandle(item.username || item.ownerUsername)
         return mapProfileResult(item, metaByUsername[u] || null)
       })
       .filter(p => p.username)
-    return { status: 'SUCCEEDED', items: profiles }
+    return { status: 'SUCCEEDED', items: profiles, skippedErrors }
   }
 
   if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(run.status)) {
@@ -586,11 +611,79 @@ async function getQuotaStatus(options = {}) {
   return payload
 }
 
+/**
+ * Enriquece um único perfil on-demand via Apify (`instagram-profile-scraper`) + Linktree/bio
+ * Retorna `{ ok: true, notFound: false, profile }` ou `{ ok: false, notFound: true, errorReason }`
+ */
+async function enrichSingleProfile(rawUsername) {
+  const cleanUsername = String(rawUsername || '')
+    .trim()
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, '')
+    .split(/[/?#]/)[0]
+    .replace(/^@+/, '')
+    .toLowerCase()
+
+  if (!cleanUsername) {
+    return { ok: false, notFound: false, errorReason: 'username_invalid' }
+  }
+
+  if (!process.env.APIFY_TOKEN) {
+    return { ok: false, notFound: false, missingToken: true, errorReason: 'APIFY_TOKEN não configurado no servidor' }
+  }
+
+  const { ApifyClient } = require('apify-client')
+  const client = new ApifyClient({ token: process.env.APIFY_TOKEN })
+
+  console.log(`[apify] Enriquecendo perfil único @${cleanUsername} via instagram-profile-scraper`)
+  const run = await client.actor('apify/instagram-profile-scraper').call({
+    usernames: [cleanUsername],
+    includeAboutSection: false,
+  })
+  clearQuotaCache()
+
+  const dataset = await client.dataset(run.defaultDatasetId).listItems()
+  const first = (dataset?.items || [])[0]
+
+  if (!first || first.error) {
+    const reason = first?.error || 'not_found'
+    const isMissingOnIg = reason === 'not_found' || reason === 'Restricted profile' || !first
+    return {
+      ok: false,
+      notFound: isMissingOnIg,
+      errorReason: reason,
+      username: cleanUsername,
+    }
+  }
+
+  const mapped = mapProfileResult(first)
+  const bioAudit = fastInspectBio(mapped.bio, mapped.external_url)
+  let extAudit = null
+  if ((!mapped.whatsapp || !mapped.email) && mapped.external_url) {
+    extAudit = await inspectLink(mapped.external_url, mapped.bio).catch(() => null)
+  }
+
+  return {
+    ok: true,
+    notFound: false,
+    profile: {
+      ...mapped,
+      whatsapp: mapped.whatsapp || extAudit?.whatsapp || bioAudit.whatsapp || null,
+      email: mapped.email || extAudit?.email || bioAudit.email || null,
+      has_competitor: extAudit?.hasCompetitor || bioAudit.hasCompetitor || false,
+      competitor_name: extAudit?.competitorName || bioAudit.competitorName || null,
+      is_agency: mapped.is_agency || extAudit?.isAgency || bioAudit.isAgency || false,
+      promotes_raffle: mapped.promotes_raffle || extAudit?.promotesRaffle || bioAudit.promotesRaffle || false,
+      promotes_shopee: mapped.promotes_shopee || extAudit?.promotesShopee || bioAudit.promotesShopee || false,
+    },
+  }
+}
+
 module.exports = {
   buildSearchInput,
   extractCreatorsFromSearchItems,
   startAsyncSearch,
   startProfileEnrichment,
+  enrichSingleProfile,
   checkRunsStatus,
   checkActorRun,
   mapProfileResult,

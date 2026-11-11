@@ -66,13 +66,48 @@ async function resolveShortlink(shortUrl) {
   }
 }
 
+const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi
+const IGNORED_EMAIL_DOMAINS = [
+  'example.com',
+  'sentry.io',
+  'wixpress.com',
+  'linktr.ee',
+  'linktree.com',
+  'instagram.com',
+  'w3.org',
+  'schema.org',
+]
+
+function extractEmail(text) {
+  if (!text || typeof text !== 'string') return null
+  const mailtoMatch = text.match(/mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i)
+  if (mailtoMatch) {
+    const candidate = mailtoMatch[1].toLowerCase().trim()
+    const domain = candidate.split('@')[1]
+    if (domain && !IGNORED_EMAIL_DOMAINS.some((d) => domain.includes(d))) {
+      return candidate
+    }
+  }
+  const matches = text.match(EMAIL_REGEX)
+  if (!matches) return null
+  for (const raw of matches) {
+    const clean = raw.toLowerCase().trim()
+    const domain = clean.split('@')[1]
+    if (!domain || IGNORED_EMAIL_DOMAINS.some((d) => domain.includes(d))) continue
+    if (/\.(png|jpe?g|webp|svg|gif|css|js)$/i.test(clean)) continue
+    return clean
+  }
+  return null
+}
+
 /**
  * Inspeciona o link externo e a bio do influenciador
- * Detecta WhatsApp, Concorrentes, Agência, Rifas, Achadinhos e Risco Menor de Idade
+ * Detecta WhatsApp, E-mail, Concorrentes, Agência, Rifas, Achadinhos e Risco Menor de Idade
  */
 async function inspectLink(url, bio = '') {
   const result = {
     whatsapp: null,
+    email: extractEmail(bio) || extractEmail(url) || null,
     hasCompetitor: false,
     competitorName: null,
     isAgency: false,
@@ -202,6 +237,11 @@ async function inspectLink(url, bio = '') {
         }
       }
 
+      // Camada C.2: Extração de E-mail no Linktree/Bio Externa
+      if (!result.email) {
+        result.email = extractEmail(allHrefs) || extractEmail(pageText) || null
+      }
+
       // Detecção de Concorrentes
       if (!result.hasCompetitor) {
         for (const term of COMPETITORS) {
@@ -264,6 +304,7 @@ async function inspectLink(url, bio = '') {
 function fastInspectBio(bio = '', externalUrl = '') {
   const result = {
     whatsapp: null,
+    email: extractEmail(bio) || extractEmail(externalUrl) || null,
     hasCompetitor: false,
     competitorName: null,
     isAgency: false,
@@ -333,5 +374,5 @@ function fastInspectBio(bio = '', externalUrl = '') {
   return result
 }
 
-module.exports = { inspectLink, fastInspectBio, COMPETITORS, AGENCY_TERMS, RAFFLE_TERMS, SHOPEE_TERMS }
+module.exports = { inspectLink, fastInspectBio, extractEmail, COMPETITORS, AGENCY_TERMS, RAFFLE_TERMS, SHOPEE_TERMS }
 

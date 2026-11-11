@@ -12,9 +12,11 @@ import {
   Flame,
   UserSearch,
   Layers,
+  ExternalLink,
 } from 'lucide-react'
 import { NICHE_PRESETS } from '../constants/nichePresets'
 import { api } from '../lib/api'
+import { cleanInstagramHandle, getInstagramProfileUrl, formatFollowersLabel } from '../lib/instagram'
 import ApifyThermometer from './ApifyThermometer'
 
 const SEARCH_MODES = [
@@ -366,16 +368,30 @@ export default function MineModal({
                       }}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                          @{c.username}
-                        </span>
+                        {getInstagramProfileUrl(c.username) ? (
+                          <a
+                            href={getInstagramProfileUrl(c.username)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold truncate text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                          >
+                            @{cleanInstagramHandle(c.username)}
+                            <ExternalLink size={10} />
+                          </a>
+                        ) : (
+                          <span className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                            @{c.username}
+                          </span>
+                        )}
                         <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {formatNum(c.followers_count)} seguidores • {formatNum(c.avg_reels_views)} views
+                          {formatFollowersLabel(c.followers_count, false)} • {c.avg_reels_views > 0 ? `${formatNum(c.avg_reels_views)} views` : 'views n/d'}
                         </span>
                       </div>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">
-                        {c.classification} ({c.score})
-                      </span>
+                      {c.classification && c.score > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">
+                          {c.classification} ({c.score})
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -4,6 +4,8 @@
 const express = require('express')
 const router = express.Router()
 const store = require('../db/store')
+const apifyService = require('../services/apify')
+const { calculateScore } = require('../services/scoring')
 
 const VALID_STATUSES = [
   'Novo',
@@ -91,6 +93,9 @@ router.post('/', async (req, res) => {
     }
 
     const created = await store.createInfluencer(body)
+    if (!created) {
+      return res.status(400).json({ error: 'Informe um @username válido do Instagram (não cole link de Reel ou Post).' })
+    }
     res.status(201).json({ data: created })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -128,6 +133,67 @@ router.get('/profile/:username', async (req, res) => {
       return res.status(404).json({ error: 'Influenciador não encontrado' })
     }
     res.json(fullProfile)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/influencers/:id/enrich — Busca dados reais de 1 perfil no Apify (seguidores, bio, WhatsApp, e-mail)
+router.post('/:id/enrich', async (req, res) => {
+  try {
+    const current = await store.getInfluencer(req.params.id)
+    if (!current) {
+      return res.status(404).json({ error: 'Influenciador não encontrado' })
+    }
+
+    const result = await apifyService.enrichSingleProfile(current.username)
+    if (result.missingToken) {
+      return res.status(400).json({ error: result.errorReason || 'APIFY_TOKEN não configurado no servidor' })
+    }
+
+    if (result.notFound) {
+      const updated = await store.updateInfluencer(current.id, { ig_not_found: true })
+      return res.json({
+        data: updated,
+        notFound: true,
+        message: `@${current.username} não existe ou está restrito no Instagram (${result.errorReason}).`,
+      })
+    }
+
+    if (!result.ok || !result.profile) {
+      return res.status(502).json({ error: result.errorReason || 'Falha ao buscar perfil no Apify' })
+    }
+
+    const profile = result.profile
+    const { score, classification } = calculateScore({ ...current, ...profile })
+    const updated = await store.updateInfluencer(current.id, {
+      full_name: profile.full_name || current.full_name,
+      profile_pic_url: profile.profile_pic_url || current.profile_pic_url,
+      bio: profile.bio || current.bio,
+      external_url: profile.external_url || current.external_url,
+      followers_count: profile.followers_count || 0,
+      following_count: profile.following_count || 0,
+      posts_count: profile.posts_count || 0,
+      avg_reels_views: profile.avg_reels_views || 0,
+      engagement_rate: profile.engagement_rate || 0,
+      whatsapp: current.whatsapp || profile.whatsapp || null,
+      email: current.email || profile.email || null,
+      niche: profile.niche || current.niche,
+      is_agency: profile.is_agency,
+      promotes_raffle: profile.promotes_raffle,
+      promotes_shopee: profile.promotes_shopee,
+      has_competitor: profile.has_competitor,
+      competitor_name: profile.competitor_name,
+      score,
+      classification,
+      ig_not_found: false,
+    })
+
+    res.json({
+      data: updated,
+      notFound: false,
+      message: `Perfil @${current.username} atualizado com métricas reais do Instagram.`,
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

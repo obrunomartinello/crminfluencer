@@ -14,6 +14,7 @@ import {
   Info,
 } from 'lucide-react'
 import { api } from '../lib/api'
+import { cleanInstagramHandle, getInstagramProfileUrl } from '../lib/instagram'
 import AddDepositantesModal from './AddDepositantesModal'
 
 function formatBRL(val) {
@@ -203,16 +204,22 @@ export default function MetasView({ onSelectInfluencer }) {
                       <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                         {meta.influencer_name}
                       </div>
-                      <a
-                        href={`https://instagram.com/${meta.influencer_username}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="hover:underline text-[11px] flex items-center gap-0.5 text-blue-500"
-                      >
-                        @{meta.influencer_username}
-                        <ExternalLink size={9} />
-                      </a>
+                      {getInstagramProfileUrl(meta.influencer_username) ? (
+                        <a
+                          href={getInstagramProfileUrl(meta.influencer_username)}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline text-[11px] flex items-center gap-0.5 text-blue-500"
+                        >
+                          @{cleanInstagramHandle(meta.influencer_username)}
+                          <ExternalLink size={9} />
+                        </a>
+                      ) : (
+                        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          @{meta.influencer_username}
+                        </span>
+                      )}
                     </td>
 
                     {/* Jogo */}

@@ -57,6 +57,7 @@ async function processAndIngestProfiles(profiles, options = {}) {
       const enriched = {
         ...profile,
         whatsapp: profile.whatsapp || linkData.whatsapp,
+        email: profile.email || linkData.email || null,
         has_competitor: profile.has_competitor || linkData.hasCompetitor,
         competitor_name: profile.competitor_name || linkData.competitorName,
         is_agency: profile.is_agency || linkData.isAgency,
@@ -66,15 +67,15 @@ async function processAndIngestProfiles(profiles, options = {}) {
         last_mined_at: now,
       }
 
-      const { score, classification, positives, tags, metrics } = calculateScore(enriched, linkData)
+      const { score, classification, positives, tags } = calculateScore(enriched, linkData)
 
       const res = await store.upsertInfluencer({
         ...enriched,
         score,
         classification,
-        story_views_avg: metrics?.estimatedStoryViews || 0,
-        story_clicks_avg: metrics?.estimatedStoryClicks || 0,
-        estimated_revenue: metrics?.projectedRevenueBRL || 0,
+        story_views_avg: 0,
+        story_clicks_avg: 0,
+        estimated_revenue: 0,
         user_notes: positives?.length > 0 ? `Tags: ${tags.join(', ')}` : '',
       })
 
@@ -388,5 +389,6 @@ router.post('/', async (req, res) => {
 
 router.encodeJobToken = encodeJobToken
 router.decodeJobToken = decodeJobToken
+router.processAndIngestProfiles = processAndIngestProfiles
 
 module.exports = router

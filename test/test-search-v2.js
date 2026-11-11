@@ -20,11 +20,20 @@ async function runSearchV2Tests() {
   assert.strictEqual(userInput.searchType, 'user')
   assert.strictEqual(userInput.searchLimit, 15)
   assert.strictEqual(userInput.liveSearch, true, 'User search must enable liveSearch: true')
-  console.log('✅ 1. buildSearchInput contract passed')
 
-  // 2. Test extractCreatorsFromSearchItems (Popular Reels + Coauthors + Exclusions)
+  const hashtagInput = apify.buildSearchInput('humor nordestino', 20, 'hashtag')
+  assert.strictEqual(hashtagInput.search, 'humornordestino', 'Hashtag mode must strip spaces for multi-word queries')
+  assert.strictEqual(hashtagInput.searchType, 'hashtag')
+  assert.strictEqual(hashtagInput.searchLimit, 20)
+  console.log('✅ 1. buildSearchInput contract (popular, user, hashtag) passed')
+
+  // 2. Test extractCreatorsFromSearchItems (Popular Reels + Coauthors + Exclusions + error filtering)
   assert.strictEqual(typeof apify.extractCreatorsFromSearchItems, 'function', 'extractCreatorsFromSearchItems must be exported')
   const sampleReels = [
+    {
+      username: 'perfil_fantasma',
+      error: 'not_found',
+    },
     {
       ownerUsername: 'criador_sertanejo',
       ownerFullName: 'Zé do Sertão',
@@ -53,11 +62,12 @@ async function runSearchV2Tests() {
   ]
 
   const extracted = apify.extractCreatorsFromSearchItems(sampleReels, 'popular', new Set(['ja_no_crm']))
+  assert.ok(!extracted.allUsernames.includes('perfil_fantasma'), 'Should ignore Apify items with error field (not_found)')
   assert.ok(extracted.freshUsernames.includes('criador_sertanejo'), 'Should include main ownerUsername')
   assert.ok(extracted.freshUsernames.includes('parceiro_humor'), 'Should include coauthorProducers')
   assert.ok(!extracted.freshUsernames.includes('ja_no_crm'), 'Should exclude already known CRM usernames from freshUsernames')
   assert.strictEqual(extracted.metaByUsername.criador_sertanejo.reelViews.length, 2, 'Should aggregate multiple reels of same creator')
-  console.log('✅ 2. extractCreatorsFromSearchItems contract passed')
+  console.log('✅ 2. extractCreatorsFromSearchItems contract (incl. error filter) passed')
 
   // 3. Test Stateless Job Token encode/decode
   const mineRoute = require('../server/routes/mine')
@@ -121,6 +131,32 @@ async function runSearchV2Tests() {
   } finally {
     server.close()
   }
+
+  // 6. Test Email extraction (linktree & mapProfileResult) + honest mining ingestion (no fake story projections)
+  const linktree = require('../server/services/linktree')
+  assert.strictEqual(
+    linktree.extractEmail('Publi no DM ou mailto:Parcerias@HumorBr.com.br | linktree'),
+    'parcerias@humorbr.com.br'
+  )
+  assert.strictEqual(linktree.extractEmail('icone@2x.png contacto@sentry.io erica@gmail.com'), 'erica@gmail.com')
+
+  const mappedProfile = apify.mapProfileResult({
+    username: `criador_email_${Date.now()}`,
+    fullName: 'Criador Com Email Bio',
+    followersCount: 48000,
+    biography: 'Parcerias: 085ericalima@gmail.com | Fortaleza-CE',
+    latestPosts: [{ videoPlayCount: 22000, likesCount: 1500, commentsCount: 60 }],
+  })
+  assert.strictEqual(mappedProfile.email, '085ericalima@gmail.com')
+
+  const ingestRes = await mineRoute.processAndIngestProfiles([mappedProfile], { query: 'humor fortaleza' })
+  assert.strictEqual(ingestRes.imported, 1)
+  const ingested = ingestRes.records[0]
+  assert.strictEqual(ingested.email, '085ericalima@gmail.com')
+  assert.strictEqual(ingested.story_views_avg, 0, 'Mining must not fabricate Story views')
+  assert.strictEqual(ingested.story_clicks_avg, 0, 'Mining must not fabricate Story clicks')
+  assert.strictEqual(ingested.estimated_revenue, 0, 'Mining must not fabricate R$ 16/click revenue estimates')
+  console.log('✅ 6. Email extraction & honest mining ingestion passed')
 
   console.log('\n🎉 ALL SEARCH V2.1 TESTS PASSED!')
 }

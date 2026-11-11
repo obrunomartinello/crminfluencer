@@ -2,8 +2,9 @@
  * @pilar PILAR 3 — Funil SDR: Minerados, Kanban & Ficha
  */
 import React, { useState } from 'react'
-import { X, UserPlus, DollarSign, TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
+import { X, UserPlus, DollarSign, TrendingUp, AlertCircle, Loader2, Mail } from 'lucide-react'
 import { PEDRO_STATUSES } from '../constants/nichePresets'
+import { cleanInstagramHandle } from '../lib/instagram'
 
 export default function CreateLeadModal({ open, onClose, onCreated }) {
   if (!open) return null
@@ -15,6 +16,7 @@ function CreateLeadModalForm({ onClose, onCreated }) {
   const [fullName, setFullName] = useState('')
   const [followers, setFollowers] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [email, setEmail] = useState('')
   const [storyViews, setStoryViews] = useState('')
   const [paidAmount, setPaidAmount] = useState('')
   const [revenueGenerated, setRevenueGenerated] = useState('')
@@ -34,23 +36,25 @@ function CreateLeadModalForm({ onClose, onCreated }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!username.trim()) {
-      setError('O @username é obrigatório')
+    const cleanUsername = cleanInstagramHandle(username)
+    if (!cleanUsername) {
+      setError('Informe um @ ou link de perfil válido do Instagram (ex: @nome ou instagram.com/nome)')
       return
     }
 
     setLoading(true)
     setError(null)
 
-    const cleanUsername = username.replace(/^@/, '').trim().toLowerCase()
     const cleanPhone = whatsapp.replace(/\D/g, '')
+    const cleanEmail = email.trim().toLowerCase()
 
     const payload = {
       username: cleanUsername,
       full_name: fullName.trim() || cleanUsername,
-      followers_count: parseInt(followers) || 0,
+      followers_count: parseInt(followers, 10) || 0,
       whatsapp: cleanPhone || null,
-      story_views_avg: parseInt(storyViews) || 0,
+      email: cleanEmail || null,
+      story_views_avg: parseInt(storyViews, 10) || 0,
       paid_amount: paidNum,
       revenue_generated: revNum,
       status,
@@ -65,6 +69,7 @@ function CreateLeadModalForm({ onClose, onCreated }) {
       setFullName('')
       setFollowers('')
       setWhatsapp('')
+      setEmail('')
       setStoryViews('')
       setPaidAmount('')
       setRevenueGenerated('')
@@ -161,17 +166,17 @@ function CreateLeadModalForm({ onClose, onCreated }) {
             </div>
           </div>
 
-          {/* Linha 2: Seguidores, WhatsApp e Nicho */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Linha 2: Seguidores, WhatsApp, E-mail e Nicho */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                Seguidores
+                WhatsApp
               </label>
               <input
-                type="number"
-                value={followers}
-                onChange={(e) => setFollowers(e.target.value)}
-                placeholder="ex: 45000"
+                type="text"
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="ex: 11999998888"
                 disabled={loading}
                 className="w-full px-3 py-2 border rounded-xl text-xs font-medium"
                 style={{
@@ -182,14 +187,36 @@ function CreateLeadModalForm({ onClose, onCreated }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                WhatsApp
+              <label className="block text-xs font-semibold mb-1 flex items-center gap-1" style={{ color: 'var(--text-primary)' }}>
+                <Mail size={12} className="text-blue-500" />
+                E-mail (opcional)
               </label>
               <input
-                type="text"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="ex: 11999998888"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ex: contato@criador.com"
+                disabled={loading}
+                className="w-full px-3 py-2 border rounded-xl text-xs font-medium"
+                style={{
+                  backgroundColor: 'var(--input-bg)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                Seguidores (opcional)
+              </label>
+              <input
+                type="number"
+                value={followers}
+                onChange={(e) => setFollowers(e.target.value)}
+                placeholder="deixe vazio se n/d"
                 disabled={loading}
                 className="w-full px-3 py-2 border rounded-xl text-xs font-medium"
                 style={{
@@ -235,7 +262,7 @@ function CreateLeadModalForm({ onClose, onCreated }) {
                 type="number"
                 value={storyViews}
                 onChange={(e) => setStoryViews(e.target.value)}
-                placeholder="ex: 3500"
+                placeholder="preencher quando o criador enviar"
                 disabled={loading}
                 className="w-full px-3 py-2 border rounded-xl text-xs font-medium"
                 style={{
@@ -269,18 +296,18 @@ function CreateLeadModalForm({ onClose, onCreated }) {
             </div>
           </div>
 
-          {/* Bloco Financeiro do Pedro (Pago vs Voltou) */}
-          <div
-            className="p-3.5 rounded-xl border space-y-3"
+          {/* Bloco Financeiro do Pedro (Opcional — só se já fechou publi) */}
+          <details
+            className="p-3 rounded-xl border"
             style={{
               backgroundColor: 'var(--bg-card-secondary)',
               borderColor: 'var(--border-color)',
             }}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-                <DollarSign size={15} className="text-emerald-500" />
-                Histórico Financeiro da Parceria
+            <summary className="text-xs font-bold flex items-center justify-between cursor-pointer select-none" style={{ color: 'var(--text-primary)' }}>
+              <span className="flex items-center gap-1.5">
+                <DollarSign size={14} className="text-emerald-500" />
+                Histórico Financeiro Anterior (opcional — pago vs voltou)
               </span>
               {(paidNum > 0 || revNum > 0) && (
                 <span
@@ -294,9 +321,9 @@ function CreateLeadModalForm({ onClose, onCreated }) {
                   {netProfit >= 0 ? `Lucro: +${formatMoney(netProfit)}` : `Prejuízo: ${formatMoney(netProfit)}`}
                 </span>
               )}
-            </div>
+            </summary>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 pt-3">
               <div>
                 <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
                   Quanto foi pago (R$)
@@ -336,7 +363,7 @@ function CreateLeadModalForm({ onClose, onCreated }) {
                 />
               </div>
             </div>
-          </div>
+          </details>
 
           {/* Observações */}
           <div>

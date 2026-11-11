@@ -203,6 +203,12 @@ export const api = {
     return request(`/mine/quota${suffix}`)
   },
 
+  async enrichInfluencer(id) {
+    return request(`/influencers/${encodeURIComponent(id)}/enrich`, {
+      method: 'POST',
+    })
+  },
+
   async mine(query, count = 25) {
     return request('/mine', {
       method: 'POST',

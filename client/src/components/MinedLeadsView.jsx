@@ -6,6 +6,7 @@
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { api } from '../lib/api'
+import { cleanInstagramHandle, getInstagramProfileUrl, formatFollowersLabel } from '../lib/instagram'
 import {
   Search,
   Sparkles,
@@ -384,24 +385,35 @@ export default function MinedLeadsView({
                             <span className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
                               {inf.full_name && inf.full_name !== inf.username ? inf.full_name : `@${inf.username}`}
                             </span>
-                            <a
-                              href={`https://instagram.com/${inf.username}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
-                            >
-                              @{inf.username}
-                              <ExternalLink size={10} />
-                            </a>
-                            {inf.classification && (
+                            {getInstagramProfileUrl(inf.username) ? (
+                              <a
+                                href={getInstagramProfileUrl(inf.username)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                              >
+                                @{cleanInstagramHandle(inf.username)}
+                                <ExternalLink size={10} />
+                              </a>
+                            ) : (
+                              <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                                @{inf.username}
+                              </span>
+                            )}
+                            {inf.ig_not_found && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25">
+                                ⚠️ @ não encontrado
+                              </span>
+                            )}
+                            {inf.classification && (inf.score > 0) && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">
-                                {inf.classification} ({inf.score || 0})
+                                {inf.classification} ({inf.score})
                               </span>
                             )}
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                            <span>👥 {formatCompact(inf.followers_count)} seguidores</span>
+                            <span>👥 {formatFollowersLabel(inf.followers_count, false)}</span>
                             <span>•</span>
                             <span>
                               👁️ {inf.avg_reels_views > 0 ? `${formatCompact(inf.avg_reels_views)} views Reels` : 'views n/d'}

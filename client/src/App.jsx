@@ -684,6 +684,16 @@ export default function App() {
         influencer={selectedInfluencer}
         onClose={() => setSelectedInfluencer(null)}
         onUpdate={handleDrawerUpdate}
+        onInfluencerSynced={(updated) => {
+          if (!updated) return
+          setSelectedInfluencer(updated)
+          setInfluencers((prev) =>
+            prev.map((i) => (String(i.id) === String(updated.id) ? { ...i, ...updated } : i))
+          )
+          updateCachedLead(updated)
+          fetchStats()
+          setMinedRefreshKey((k) => k + 1)
+        }}
         onCreatePublicidadeForInfluencer={handleOpenCreatePubliForInfluencer}
       />
 

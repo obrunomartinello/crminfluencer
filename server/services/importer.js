@@ -173,7 +173,7 @@ const RAW_CAPTACAO = [
   { name: 'Bruno', username: 'viegas46_oficial', whatsapp: '66 999779079', date: '2026-10-25', status: 'Fechou', game: 'Bubblewin', notes: '' },
   { name: 'Rafael', username: 'rafael_kauffmann', whatsapp: '91 984186211', date: '2026-10-26', status: 'Sem resposta', game: 'Bubblewin', notes: '' },
   { name: 'Tavares', username: 'eutavaresfilho', whatsapp: '97 991389236', date: '2026-10-26', status: 'Sem resposta', game: 'Bubblewin', notes: '' },
-  { name: 'Samurai', username: 'samuraii_da_resenha', whatsapp: '85 982197809', date: '2026-10-26', status: 'Fechou', game: 'Bubblewin', notes: '' },
+  { name: 'Samurai', username: 'samuraii_da_resenhaa', whatsapp: '85 982197809', date: '2026-10-26', status: 'Fechou', game: 'Bubblewin', notes: '' },
   { name: 'Isaac', username: 'isaacsouzagg', whatsapp: '51 994485388', date: '2026-10-27', status: 'Recusado - métricas ruins', game: 'Bubblewin', notes: '' },
   { name: 'Anderson', username: 'gadeia244', whatsapp: '55 996681614', date: '2026-10-27', status: 'Em negociação', game: 'Bubblewin', notes: '' },
   { name: 'Mayra', username: 'alexsandra_mayra_', whatsapp: '85 992281995', date: '2026-10-27', status: 'Recusado - métricas ruins', game: 'Bubblewin', notes: '' },
@@ -219,10 +219,18 @@ const RAW_METAS = [
   { name: 'Ryan', username: 'dona.jozi', whatsapp: '98 970137966', game: 'Bubble Win', invested: 300, target: 35, reached: 2, status: 'Em andamento' },
   { name: 'André', username: '_victor084', whatsapp: '84 987292581', game: 'Bubble Win', invested: 350, target: 35, reached: 26, status: 'Em andamento' },
   { name: 'Wesley', username: 'el_grilooreserva', whatsapp: '62 993078115', game: 'Bubble Win', invested: 305, target: 35, reached: 10, status: 'Em andamento' },
-  { name: 'Samurai', username: 'samuraii_da_resenha', whatsapp: '85 982197809', game: 'Bubble Win', invested: 500, target: 55, reached: 55, status: 'Meta atingida' },
+  { name: 'Samurai', username: 'samuraii_da_resenhaa', whatsapp: '85 982197809', game: 'Bubble Win', invested: 500, target: 55, reached: 55, status: 'Meta atingida' },
   { name: 'João', username: 'joazin_75', whatsapp: '75 982334609', game: 'Bubble Win', invested: 300, target: 35, reached: 19, status: 'Em andamento' },
-  { name: 'Samurai', username: 'samuraii_da_resenha', whatsapp: '85 982197809', game: 'Bubble Win', invested: 600, target: 65, reached: 0, status: 'Em andamento' },
+  { name: 'Samurai', username: 'samuraii_da_resenhaa', whatsapp: '85 982197809', game: 'Bubble Win', invested: 600, target: 65, reached: 0, status: 'Em andamento' },
 ]
+
+// Perfis que retornaram error: "not_found" em auditoria direta no Instagram (Apify)
+const VERIFIED_IG_NOT_FOUND = new Set([
+  'mathuesinho_oficialz',
+  'eugael',
+  'gz_userr22',
+  'oblogueirinho_offc',
+])
 
 /**
  * Normaliza e gera a base inicial completa a partir das 3 planilhas do Pedro
@@ -230,7 +238,7 @@ const RAW_METAS = [
 function buildInitialDatabase() {
   const influencersMap = new Map()
 
-  // 1. Inserir todos os 87 da Captação
+  // 1. Inserir todos da Captação
   for (const c of RAW_CAPTACAO) {
     const username = normalizeUsername(c.username)
     if (!username) continue
@@ -244,22 +252,24 @@ function buildInitialDatabase() {
       full_name: c.name || username,
       whatsapp: phone,
       formatted_phone: formatPhoneBR(phone),
+      email: null,
       status: c.status ? c.status.trim() : 'Novo',
       user_notes: c.notes || '',
       is_ghost: !!isGhost,
       referred_by: hasReferred ? c.notes : null,
       campaign_game: normalizeGame(c.game),
       contact_date: c.date || new Date().toISOString().split('T')[0],
-      followers_count: 25000,
-      classification: c.status === 'Fechou' ? 'OURO' : 'PRATA',
-      score: c.status === 'Fechou' ? 95 : 65,
+      followers_count: 0,
+      classification: null,
+      score: 0,
+      ig_not_found: VERIFIED_IG_NOT_FOUND.has(username),
       is_agency: false,
       promotes_raffle: false,
       promotes_shopee: false,
     })
   }
 
-  // 2. Processar e vincular as 17 Publicidades
+  // 2. Processar e vincular as Publicidades
   const publicidadesList = []
   let adId = 1
 
@@ -270,21 +280,23 @@ function buildInitialDatabase() {
     const dates = normalizeDate(p.date)
     const phone = normalizePhone(p.whatsapp)
 
-    // Se o influenciador ainda não estava na lista, cadastra
+    // Se o influenciador ainda não estava na lista, cadastra sem inventar seguidores/score
     if (!influencersMap.has(username) && username) {
       influencersMap.set(username, {
         username,
         full_name: p.name || username,
         whatsapp: phone,
         formatted_phone: formatPhoneBR(phone),
+        email: null,
         status: 'Fechou',
         user_notes: 'Adicionado via controle de publicidades',
         is_ghost: closure.isGhost,
         campaign_game: normalizeGame(p.game),
         contact_date: dates.startDate || '2026-10-01',
-        followers_count: 35000,
-        classification: 'OURO',
-        score: 90,
+        followers_count: 0,
+        classification: null,
+        score: 0,
+        ig_not_found: VERIFIED_IG_NOT_FOUND.has(username),
         is_agency: false,
         promotes_raffle: false,
         promotes_shopee: false,

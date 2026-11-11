@@ -167,6 +167,113 @@ async function runV3WorkflowTests() {
     )
     console.log('✅ 5. Review Focus edge cases (empty fields & Novo revert) passed')
 
+    // 8. Instagram URL / @handle normalization & invalid non-profile path rejection
+    assert.strictEqual(store.normalizeHandleInput('https://www.instagram.com/@EuGael/?igsh=abc'), 'eugael')
+    assert.strictEqual(store.normalizeHandleInput('instagram.com/rayssamylene_/reels/'), 'rayssamylene_')
+    assert.strictEqual(store.normalizeHandleInput('https://www.instagram.com/reel/ABC123/'), '')
+
+    const urlLeadRes = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: `https://www.instagram.com/@url_teste_${Date.now()}/?igsh=xyz`,
+        full_name: 'Lead Colado Como Link',
+      }),
+    })
+    assert.strictEqual(urlLeadRes.status, 201)
+    const { data: urlLead } = await urlLeadRes.json()
+    assert.ok(urlLead.username.startsWith('url_teste_') && !urlLead.username.includes('instagram.com'))
+
+    const badUrlRes = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'https://www.instagram.com/reel/C99999/',
+      }),
+    })
+    assert.strictEqual(badUrlRes.status, 400)
+    console.log('✅ 6. Instagram URL/@handle normalization & invalid link rejection passed')
+
+    // 9. Honest seed metrics (no fake 25k/35k or OURO/PRATA), Samurai dedup & ig_not_found + email field
+    const samuraiOld = await store.getInfluencerFullProfile('samuraii_da_resenha')
+    assert.strictEqual(samuraiOld, null, 'Typo samuraii_da_resenha must be merged into samuraii_da_resenhaa')
+
+    const samuraiReal = await store.getInfluencerFullProfile('samuraii_da_resenhaa')
+    assert.ok(samuraiReal && samuraiReal.influencer, 'samuraii_da_resenhaa must exist unified')
+    assert.strictEqual(samuraiReal.influencer.followers_count, 0, 'Unscraped Excel lead must have 0 followers until enriched')
+    assert.strictEqual(samuraiReal.influencer.classification, null, 'Unscraped Excel lead must have null classification until enriched')
+    assert.strictEqual(samuraiReal.influencer.score, 0, 'Unscraped Excel lead must have 0 score until enriched')
+
+    const deadLead = await store.getInfluencerFullProfile('eugael')
+    assert.ok(deadLead && deadLead.influencer.ig_not_found, 'Verified not_found IG account (eugael) must be flagged ig_not_found=true')
+
+    const emailLeadRes = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: `email_teste_${Date.now()}`,
+        full_name: 'Criador Com Email',
+        email: 'Contato@CriadorTeste.COM',
+        whatsapp: '85988887777',
+      }),
+    })
+    assert.strictEqual(emailLeadRes.status, 201)
+    const { data: emailLead } = await emailLeadRes.json()
+    assert.strictEqual(emailLead.email, 'contato@criadorteste.com', 'Email must be normalized and saved')
+    assert.strictEqual(emailLead.followers_count, 0, 'Manual lead without followers must stay 0 (honest)')
+    assert.strictEqual(emailLead.classification, null, 'Manual lead without metrics must stay classification=null')
+    console.log('✅ 7. Honest seed metrics, Samurai dedup, ig_not_found & email persistence passed')
+
+    // 10. POST /api/influencers/:id/enrich (success + notFound with stubbed apifyService, 0 tokens burned)
+    const apifyService = require('../server/services/apify')
+    const originalEnrich = apifyService.enrichSingleProfile
+    try {
+      apifyService.enrichSingleProfile = async (uname) => ({
+        ok: true,
+        notFound: false,
+        profile: {
+          username: uname,
+          full_name: 'Criador Atualizado IG',
+          followers_count: 52000,
+          avg_reels_views: 19000,
+          engagement_rate: 36.5,
+          bio: 'Contato: parceria@teste.com',
+          email: 'parceria@teste.com',
+          whatsapp: '5511900001111',
+          is_agency: false,
+          promotes_raffle: false,
+          promotes_shopee: false,
+          has_competitor: false,
+          competitor_name: null,
+        },
+      })
+
+      const enrichOkRes = await fetch(`${baseUrl}/${emailLead.id}/enrich`, { method: 'POST' })
+      assert.strictEqual(enrichOkRes.status, 200)
+      const enrichOk = await enrichOkRes.json()
+      assert.strictEqual(enrichOk.notFound, false)
+      assert.strictEqual(enrichOk.data.followers_count, 52000)
+      assert.strictEqual(enrichOk.data.whatsapp, '85988887777', 'Must preserve existing manual WhatsApp')
+      assert.strictEqual(enrichOk.data.email, 'contato@criadorteste.com', 'Must preserve existing manual email')
+      assert.ok(enrichOk.data.score > 0 && enrichOk.data.classification, 'Must calculate score after real IG enrichment')
+
+      apifyService.enrichSingleProfile = async (uname) => ({
+        ok: false,
+        notFound: true,
+        errorReason: 'not_found',
+        username: uname,
+      })
+
+      const enrichMissingRes = await fetch(`${baseUrl}/${urlLead.id}/enrich`, { method: 'POST' })
+      assert.strictEqual(enrichMissingRes.status, 200)
+      const enrichMissing = await enrichMissingRes.json()
+      assert.strictEqual(enrichMissing.notFound, true)
+      assert.strictEqual(enrichMissing.data.ig_not_found, true)
+      console.log('✅ 8. POST /api/influencers/:id/enrich (real metrics & ig_not_found flag) passed')
+    } finally {
+      apifyService.enrichSingleProfile = originalEnrich
+    }
+
     console.log('\n🎉 ALL V3.0 SDR WORKFLOW TESTS PASSED!')
   } finally {
     server.close()

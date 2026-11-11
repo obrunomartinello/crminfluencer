@@ -1,8 +1,10 @@
 import React from 'react'
 import { PEDRO_STATUSES } from '../constants/nichePresets'
+import { cleanInstagramHandle, getInstagramProfileUrl, formatFollowersLabel } from '../lib/instagram'
 import {
   ExternalLink,
   Phone,
+  Mail,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
@@ -11,10 +13,9 @@ import {
   Building2,
   Ticket,
   ShoppingBag,
-  TrendingUp,
-  TrendingDown,
   UserPlus,
   Edit3,
+  AlertTriangle,
 } from 'lucide-react'
 
 export default function InfluencerTable({
@@ -57,6 +58,13 @@ export default function InfluencerTable({
   }
 
   const getClassificationBadge = (cls, score) => {
+    if (!cls || !(Number(score) > 0)) {
+      return (
+        <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          Não analisado
+        </span>
+      )
+    }
     switch (cls) {
       case 'OURO':
         return (
@@ -193,11 +201,11 @@ export default function InfluencerTable({
               }}
             >
               <th className="py-3 px-4">Criador</th>
-              <th className="py-3 px-3">Audiência</th>
-              <th className="py-3 px-3">Stories & Cliques</th>
-              <th className="py-3 px-3">Financeiro (Pago vs Voltou)</th>
-              <th className="py-3 px-3">SDR & Bio</th>
-              <th className="py-3 px-3">Lead Score</th>
+              <th className="py-3 px-3">Contato (Whats / E-mail)</th>
+              <th className="py-3 px-3">Audiência (IG Real)</th>
+              <th className="py-3 px-3">Jogo & Stories Reais</th>
+              <th className="py-3 px-3">Bio / Alerta</th>
+              <th className="py-3 px-3">Score IG</th>
               <th className="py-3 px-3">Pipeline</th>
               <th className="py-3 px-3">Observações</th>
               <th className="py-3 px-4 text-right">Ação</th>
@@ -208,11 +216,10 @@ export default function InfluencerTable({
               const initials = (inf.full_name || inf.username || '?')
                 .slice(0, 2)
                 .toUpperCase()
-
-              const paidNum = parseFloat(inf.paid_amount) || 0
-              const revNum = parseFloat(inf.revenue_generated) || 0
-              const hasFinancialData = paidNum > 0 || revNum > 0
-              const netProfit = revNum - paidNum
+              const igUrl = getInstagramProfileUrl(inf.username)
+              const cleanHandle = cleanInstagramHandle(inf.username) || inf.username
+              const hasScrapedProfile = (Number(inf.followers_count) || 0) > 0 || Boolean(inf.bio)
+              const hasContact = Boolean(inf.whatsapp || inf.email)
 
               return (
                 <tr
@@ -246,24 +253,39 @@ export default function InfluencerTable({
                         </div>
                       )}
                       <div className="min-w-0">
-                        <div
-                          className="font-semibold truncate transition-colors group-hover:text-blue-500"
-                          style={{ color: 'var(--text-primary)' }}
-                        >
-                          {inf.full_name || inf.username}
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="font-semibold truncate transition-colors group-hover:text-blue-500"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            {inf.full_name || cleanHandle}
+                          </span>
+                          {inf.ig_not_found && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 shrink-0"
+                              title="Instagram retornou perfil inexistente ou restrito"
+                            >
+                              <AlertTriangle size={9} /> @ fora do ar
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <a
-                            href={`https://instagram.com/${inf.username}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="hover:underline flex items-center gap-0.5 text-[11px] truncate transition-colors"
-                            style={{ color: 'var(--text-muted)' }}
-                          >
-                            @{inf.username}
-                            <ExternalLink size={9} className="shrink-0" />
-                          </a>
+                          {igUrl ? (
+                            <a
+                              href={igUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="hover:underline flex items-center gap-0.5 text-[11px] truncate transition-colors text-blue-600 dark:text-blue-400"
+                            >
+                              @{cleanHandle}
+                              <ExternalLink size={9} className="shrink-0" />
+                            </a>
+                          ) : (
+                            <span className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
+                              @{cleanHandle}
+                            </span>
+                          )}
                           {inf.niche && inf.niche !== 'Geral' && (
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-500/10 text-zinc-500 truncate max-w-[90px]">
                               {inf.niche}
@@ -279,11 +301,40 @@ export default function InfluencerTable({
                     </div>
                   </td>
 
-                  {/* Audiência (Seguidores + Engajamento) */}
+                  {/* Contato (WhatsApp + E-mail) */}
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <div className="flex flex-col gap-1 items-start">
+                      {inf.whatsapp && (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium font-mono">
+                          <Phone size={10} className="shrink-0" />
+                          <span>{inf.formatted_phone || inf.whatsapp}</span>
+                        </span>
+                      )}
+                      {inf.email && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400 font-medium max-w-[170px] truncate"
+                          title={inf.email}
+                        >
+                          <Mail size={10} className="shrink-0" />
+                          <span className="truncate">{inf.email}</span>
+                        </span>
+                      )}
+                      {!hasContact && (
+                        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          Sem contato ainda
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Audiência (Seguidores Reais + Engajamento) */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {formatNum(inf.followers_count)}
+                      <span
+                        className="font-semibold"
+                        style={{ color: inf.followers_count > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}
+                      >
+                        {formatFollowersLabel(inf.followers_count, false)}
                       </span>
                       {inf.followers_count >= 15000 && (
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25" title="Lead com audiência qualificada (+15k seguidores)">
@@ -291,62 +342,50 @@ export default function InfluencerTable({
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5">
-                      {getEngagementBadge(inf.engagement_rate)}
-                    </div>
-                  </td>
-
-                  {/* Stories & Cliques */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {inf.story_views_avg > 0 ? `${formatNum(inf.story_views_avg)} views` : '—'}
-                    </div>
-                    <div className="text-[11px] font-medium text-blue-500">
-                      {inf.story_clicks_avg > 0 ? `~${formatNum(inf.story_clicks_avg)} cliques` : '—'}
-                    </div>
-                  </td>
-
-                  {/* Financeiro do Pedro (Pago vs Voltou) */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    {hasFinancialData ? (
-                      <div className="flex flex-col gap-0.5">
-                        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                          Pago: <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(paidNum)}</span>
-                        </div>
-                        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                          Voltou: <span className="font-semibold text-emerald-500">{formatMoney(revNum)}</span>
-                        </div>
-                        <div>
-                          <span
-                            className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                              netProfit >= 0
-                                ? 'bg-emerald-500/15 text-emerald-500'
-                                : 'bg-red-500/15 text-red-500'
-                            }`}
-                          >
-                            {netProfit >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                            {netProfit >= 0 ? `+${formatMoney(netProfit)}` : formatMoney(netProfit)}
-                          </span>
-                        </div>
-                      </div>
-                    ) : inf.estimated_revenue > 0 ? (
-                      <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        Proj: <span className="font-semibold text-blue-400">{formatMoney(inf.estimated_revenue)}</span>
+                    {inf.followers_count > 0 ? (
+                      <div className="mt-0.5">
+                        {getEngagementBadge(inf.engagement_rate)}
                       </div>
                     ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        Abra Ficha → Atualizar IG
+                      </div>
                     )}
                   </td>
 
-                  {/* SDR & Bio (Anti-Lixo + Concorrência + WhatsApp) */}
+                  {/* Jogo & Stories Reais */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="flex flex-col gap-1 items-start">
-                      {inf.whatsapp && (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                          <Phone size={10} className="shrink-0" />
-                          <span>WhatsApp</span>
+                    <div className="flex flex-col gap-0.5">
+                      {inf.campaign_game && (
+                        <span className="inline-block w-fit px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-500/12 text-purple-600 dark:text-purple-300">
+                          🎮 {inf.campaign_game}
                         </span>
                       )}
+                      {inf.story_views_avg > 0 || inf.story_clicks_avg > 0 || inf.story_asking_price > 0 ? (
+                        <div className="text-[11px] space-y-0.5">
+                          {inf.story_views_avg > 0 && (
+                            <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                              👁️ {formatNum(inf.story_views_avg)} views
+                              {inf.story_clicks_avg > 0 ? ` • ${inf.story_clicks_avg} cl.` : ''}
+                            </div>
+                          )}
+                          {inf.story_asking_price > 0 && (
+                            <div className="font-bold text-amber-600 dark:text-amber-400">
+                              💰 {formatMoney(inf.story_asking_price)}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          Preencher na Ficha
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Bio / Alerta */}
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <div className="flex flex-col gap-1 items-start">
                       {inf.is_agency && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25">
                           <Building2 size={10} /> Agência
@@ -368,9 +407,13 @@ export default function InfluencerTable({
                             <ShieldAlert size={10} className="shrink-0" />
                             <span>{inf.competitor_name || 'Concorrente'}</span>
                           </span>
-                        ) : (
+                        ) : hasScrapedProfile ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
                             🌱 Virgem
+                          </span>
+                        ) : (
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            Aguardando IG
                           </span>
                         )
                       )}

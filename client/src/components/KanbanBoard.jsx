@@ -10,7 +10,9 @@ import {
   ArrowRight,
   AlertTriangle,
   Archive,
+  Mail,
 } from 'lucide-react'
+import { cleanInstagramHandle, getInstagramProfileUrl, formatFollowersLabel } from '../lib/instagram'
 
 const COLUMNS = [
   {
@@ -375,46 +377,80 @@ export default function KanbanBoard({
                               <div className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
                                 {col.isJackpot ? `🏆 ${inf.full_name || inf.username}` : (inf.full_name || inf.username)}
                               </div>
-                              <a
-                                href={`https://instagram.com/${inf.username}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-0.5 truncate max-w-full font-medium"
-                              >
-                                @{inf.username}
-                                <ExternalLink size={9} />
-                              </a>
+                              {getInstagramProfileUrl(inf.username) ? (
+                                <a
+                                  href={getInstagramProfileUrl(inf.username)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-0.5 truncate max-w-full font-medium"
+                                >
+                                  @{cleanInstagramHandle(inf.username)}
+                                  <ExternalLink size={9} />
+                                </a>
+                              ) : (
+                                <span className="text-[11px] truncate max-w-full font-medium" style={{ color: 'var(--text-muted)' }}>
+                                  @{inf.username}
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold border shrink-0 ${getClsPill(inf.classification)}`}>
-                            {getClsLabel(inf.classification)} {inf.score}
-                          </span>
+                          {inf.ig_not_found ? (
+                            <span
+                              className="px-1.5 py-0.5 rounded-full text-[9px] font-bold border shrink-0 bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                              title="Instagram retornou perfil inexistente ou restrito"
+                            >
+                              ⚠️ @ fora do ar
+                            </span>
+                          ) : inf.classification && inf.score > 0 ? (
+                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold border shrink-0 ${getClsPill(inf.classification)}`}>
+                              {getClsLabel(inf.classification)} {inf.score}
+                            </span>
+                          ) : null}
                         </div>
 
-                        {/* Métricas & Canal */}
+                        {/* Métricas Reais, Contatos & Jogo */}
                         <div className="flex flex-wrap items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
                           <span
                             className="px-1.5 py-0.5 rounded font-semibold"
                             style={{ backgroundColor: 'var(--bg-card-secondary)', color: 'var(--text-primary)' }}
-                            title="Total de seguidores no Instagram"
+                            title={inf.followers_count > 0 ? 'Seguidores reais coletados do Instagram' : 'Clique em Ficha -> Atualizar IG para puxar seguidores reais'}
                           >
-                            👥 {formatCompact(inf.followers_count)} seguidores
+                            👥 {formatFollowersLabel(inf.followers_count)}
                           </span>
-                          <span
-                            className="px-1.5 py-0.5 rounded font-semibold"
-                            style={{ backgroundColor: 'var(--bg-card-secondary)', color: 'var(--text-primary)' }}
-                            title="Média de visualizações em Reels (n/d = lead importado sem coleta de Reels)"
-                          >
-                            👁️ {inf.avg_reels_views > 0 ? `${formatCompact(inf.avg_reels_views)} views Reels` : 'views n/d'}
-                          </span>
-                          {inf.followers_count >= 15000 && (
+                          {inf.avg_reels_views > 0 && (
                             <span
-                              className="px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25"
-                              title="Criador qualificado acima de 15 mil seguidores"
+                              className="px-1.5 py-0.5 rounded font-semibold"
+                              style={{ backgroundColor: 'var(--bg-card-secondary)', color: 'var(--text-primary)' }}
+                              title="Média de views em Reels coletada no Instagram"
                             >
-                              🔥 +15k seg.
+                              🎞️ {formatCompact(inf.avg_reels_views)} Reels
+                            </span>
+                          )}
+                          {inf.story_views_avg > 0 && (
+                            <span className="px-1.5 py-0.5 rounded font-semibold bg-blue-500/12 text-blue-600 dark:text-blue-300">
+                              👁️ {formatCompact(inf.story_views_avg)} Stories
+                              {inf.story_clicks_avg > 0 ? ` • ${inf.story_clicks_avg} cl.` : ''}
+                            </span>
+                          )}
+                          {inf.story_asking_price > 0 && (
+                            <span className="px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                              💰 R$ {Number(inf.story_asking_price).toLocaleString('pt-BR')}
+                            </span>
+                          )}
+                          {inf.campaign_game && (
+                            <span className="px-1.5 py-0.5 rounded font-semibold bg-purple-500/12 text-purple-600 dark:text-purple-300">
+                              🎮 {inf.campaign_game}
+                            </span>
+                          )}
+                          {inf.email && (
+                            <span
+                              className="px-1.5 py-0.5 rounded font-medium bg-sky-500/12 text-sky-600 dark:text-sky-300 inline-flex items-center gap-1 max-w-[140px] truncate"
+                              title={inf.email}
+                            >
+                              <Mail size={9} className="shrink-0" />
+                              <span className="truncate">{inf.email}</span>
                             </span>
                           )}
                           {inf.outreach_channel && (

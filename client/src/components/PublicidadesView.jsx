@@ -17,6 +17,7 @@ import {
   Phone,
 } from 'lucide-react'
 import { api } from '../lib/api'
+import { cleanInstagramHandle, getInstagramProfileUrl } from '../lib/instagram'
 import CreatePublicidadeModal from './CreatePublicidadeModal'
 
 const GAMES = ['Block Win', 'Bubble Win', 'Cust Win', 'Count Masters']
@@ -377,16 +378,22 @@ export default function PublicidadesView({ onSelectInfluencer }) {
                         <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {ad.influencer_name}
                         </div>
-                        <a
-                          href={`https://instagram.com/${ad.influencer_username}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="hover:underline text-[11px] flex items-center gap-0.5 text-blue-500"
-                        >
-                          @{ad.influencer_username}
-                          <ExternalLink size={9} />
-                        </a>
+                        {getInstagramProfileUrl(ad.influencer_username) ? (
+                          <a
+                            href={getInstagramProfileUrl(ad.influencer_username)}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:underline text-[11px] flex items-center gap-0.5 text-blue-500"
+                          >
+                            @{cleanInstagramHandle(ad.influencer_username)}
+                            <ExternalLink size={9} />
+                          </a>
+                        ) : (
+                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                            @{ad.influencer_username}
+                          </span>
+                        )}
                       </td>
 
                       {/* Jogo */}
