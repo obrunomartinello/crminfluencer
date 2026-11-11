@@ -4,6 +4,7 @@ const store = require('../db/store')
 
 const VALID_STATUSES = [
   'Novo',
+  'Mensagem Enviada',
   'Sem resposta',
   'Em negociação',
   'Fechou',
@@ -35,6 +36,8 @@ router.get('/', async (req, res) => {
     const {
       search,
       status,
+      stage,
+      channel,
       classification,
       minFollowers,
       hideAgencies,
@@ -46,6 +49,8 @@ router.get('/', async (req, res) => {
     const result = await store.listInfluencers({
       search,
       status,
+      stage,
+      channel,
       classification,
       minFollowers,
       hideAgencies,

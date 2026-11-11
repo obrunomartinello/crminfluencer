@@ -22,6 +22,13 @@ let inMemoryInfluencers = seed.influencers.map((inf, index) => {
     story_asking_price: 0,
     estimated_revenue: 0,
     roi_verdict: null,
+    outreach_channel: inf.outreach_channel || null,
+    contacted_at: inf.contact_date
+      ? `${inf.contact_date}T12:00:00.000Z`
+      : (inf.status && inf.status !== 'Novo' ? seedDate : null),
+    last_contact_at: inf.contact_date
+      ? `${inf.contact_date}T12:00:00.000Z`
+      : (inf.status && inf.status !== 'Novo' ? seedDate : null),
     last_mined_at: null,
     source_query: null,
     created_at: seedDate,
@@ -103,8 +110,10 @@ const store = {
     const negotiating = inMemoryInfluencers.filter(i => i.status === 'Em negociação' || i.status === 'Abordado').length
     const ghost = inMemoryInfluencers.filter(i => i.is_ghost || i.user_notes?.toLowerCase().includes('ghost')).length
 
-    // Contagem por cada um dos 7 status do Pedro
+    // Contagem por etapa de abordagem + 8 status do Pedro
     const statusCounts = {
+      'Novo': 0,
+      'Mensagem Enviada': 0,
       'Sem resposta': 0,
       'Em negociação': 0,
       'Fechou': 0,
@@ -114,14 +123,40 @@ const store = {
       'Outro momento': 0,
     }
 
+    const channelCounts = { whatsapp: 0, instagram: 0, unspecified: 0 }
+    let toContactCount = 0
+    let sentWaitingCount = 0
+    let repliedCount = 0
+    let missingDataCount = 0
+
     for (const inf of inMemoryInfluencers) {
-      const s = inf.status?.trim()
+      const s = (inf.status || 'Novo').trim()
       if (statusCounts[s] !== undefined) {
         statusCounts[s]++
       }
+
+      if (s === 'Novo' || !s) {
+        toContactCount++
+      } else {
+        if (s === 'Mensagem Enviada' || s === 'Sem resposta') {
+          sentWaitingCount++
+        } else {
+          repliedCount++
+        }
+        if (inf.outreach_channel === 'whatsapp') channelCounts.whatsapp++
+        else if (inf.outreach_channel === 'instagram') channelCounts.instagram++
+        else channelCounts.unspecified++
+      }
+
+      if ((s === 'Novo' || s === 'Em negociação') && (!inf.whatsapp || !inf.story_views_avg)) {
+        missingDataCount++
+      }
     }
 
+    const sentTotalCount = Math.max(0, total - toContactCount)
     const conversionRate = total > 0 ? Math.round((closed / total) * 1000) / 10 : 0
+    const responseRate = sentTotalCount > 0 ? Math.round((repliedCount / sentTotalCount) * 1000) / 10 : 0
+    const pubStats = await this.getPublicidadesStats()
 
     return {
       total,
@@ -131,13 +166,27 @@ const store = {
       negotiating,
       ghost,
       conversionRate,
+      toContactCount,
+      sentWaitingCount,
+      sentTotalCount,
+      repliedCount,
+      responseRate,
+      missingDataCount,
+      channelCounts,
       statusCounts,
+      publicidadesSummary: {
+        totalAds: pubStats.totalAds,
+        totalInvested: pubStats.totalInvested,
+        totalReturn: pubStats.totalReturn,
+        netProfit: pubStats.netProfit,
+        overallRoi: pubStats.overallRoi,
+      },
     }
   },
 
-  async listInfluencers({ search, status, classification, minFollowers, hideAgencies, onlyMined, sortBy = 'recent', page = 1, limit = 20 }) {
+  async listInfluencers({ search, status, stage, channel, classification, minFollowers, hideAgencies, onlyMined, sortBy = 'recent', page = 1, limit = 20 }) {
     const pageNum = Math.max(1, parseInt(page) || 1)
-    const limitNum = Math.max(1, parseInt(limit) || 20)
+    const limitNum = Math.min(Math.max(1, parseInt(limit) || 20), 250)
     const offset = (pageNum - 1) * limitNum
 
     let filtered = [...inMemoryInfluencers]
@@ -155,9 +204,25 @@ const store = {
       )
     }
 
+    if (stage === 'to_contact') {
+      filtered = filtered.filter(i => (i.status || 'Novo') === 'Novo')
+    } else if (stage === 'sent') {
+      filtered = filtered.filter(i => (i.status || 'Novo') !== 'Novo')
+    }
+
+    if (channel) {
+      filtered = filtered.filter(i => i.outreach_channel === channel)
+    }
+
     if (status) {
       if (status === 'Remarketing') {
         filtered = filtered.filter(i => i.status === 'Recusado - Remarketing' || i.status === 'Outro momento')
+      } else if (status === 'Recusados') {
+        filtered = filtered.filter(i =>
+          ['Recusado - Remarketing', 'Outro momento', 'Não interessado', 'Recusado - métricas ruins'].includes(i.status)
+        )
+      } else if (status === 'Aguardando') {
+        filtered = filtered.filter(i => i.status === 'Mensagem Enviada' || i.status === 'Sem resposta')
       } else {
         filtered = filtered.filter(i => i.status === status)
       }
@@ -237,11 +302,45 @@ const store = {
 
   async updateInfluencer(id, body) {
     const index = inMemoryInfluencers.findIndex(i => String(i.id) === String(id) || i.username === String(id))
-    if (index !== -1) {
-      inMemoryInfluencers[index] = { ...inMemoryInfluencers[index], ...body }
-      return inMemoryInfluencers[index]
+    if (index === -1) return null
+
+    const current = inMemoryInfluencers[index]
+    const prevStatus = current.status || 'Novo'
+    const nextStatus = body.status !== undefined ? body.status : prevStatus
+    const now = new Date().toISOString()
+
+    let contactedAt = body.contacted_at !== undefined ? body.contacted_at : current.contacted_at || null
+    let lastContactAt = body.last_contact_at !== undefined ? body.last_contact_at : current.last_contact_at || null
+
+    if (prevStatus === 'Novo' && nextStatus !== 'Novo') {
+      if (!contactedAt) contactedAt = now
+      lastContactAt = now
+    } else if (body.outreach_channel || (body.status && body.status !== prevStatus && nextStatus !== 'Novo')) {
+      lastContactAt = now
+      if (!contactedAt && nextStatus !== 'Novo') contactedAt = now
     }
-    return null
+
+    const sanitized = { ...body }
+    if (sanitized.story_views_avg !== undefined) {
+      sanitized.story_views_avg = parseInt(sanitized.story_views_avg, 10) || 0
+    }
+    if (sanitized.story_clicks_avg !== undefined) {
+      sanitized.story_clicks_avg = parseInt(sanitized.story_clicks_avg, 10) || 0
+    }
+    if (sanitized.story_asking_price !== undefined) {
+      sanitized.story_asking_price = parseFloat(sanitized.story_asking_price) || 0
+    }
+    if (sanitized.campaign_game !== undefined) {
+      sanitized.campaign_game = sanitized.campaign_game ? normalizeGame(sanitized.campaign_game) : null
+    }
+
+    inMemoryInfluencers[index] = {
+      ...current,
+      ...sanitized,
+      contacted_at: contactedAt,
+      last_contact_at: lastContactAt,
+    }
+    return inMemoryInfluencers[index]
   },
 
   async deleteInfluencer(id) {
@@ -267,6 +366,9 @@ const store = {
         status: existing.status && existing.status !== 'Novo' ? existing.status : (item.status || existing.status || 'Novo'),
         user_notes: existing.user_notes || item.user_notes || '',
         campaign_game: existing.campaign_game || item.campaign_game || null,
+        outreach_channel: existing.outreach_channel || item.outreach_channel || null,
+        contacted_at: existing.contacted_at || item.contacted_at || null,
+        last_contact_at: existing.last_contact_at || item.last_contact_at || null,
         paid_amount: existing.paid_amount || item.paid_amount || 0,
         revenue_generated: existing.revenue_generated || item.revenue_generated || 0,
         last_mined_at: item.last_mined_at || now,
