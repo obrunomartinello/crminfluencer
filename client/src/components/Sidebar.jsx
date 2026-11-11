@@ -1,5 +1,6 @@
 import React from 'react'
 import { X } from 'lucide-react'
+import BrandLogo from './BrandLogo'
 
 export default function Sidebar({
   currentTab,
@@ -87,19 +88,19 @@ export default function Sidebar({
       {/* Brand + Workspace Card estilo Casa VIP .bet.br */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-amber-500 flex items-center justify-center shadow-md shadow-emerald-600/25 text-lg casino-shimmer">
-              <span className="casino-float select-none" aria-hidden="true">🎰</span>
+          <div className="flex items-center gap-2.5 casino-hover-spin cursor-default">
+            <div className="rounded-xl shadow-md shadow-emerald-700/25 casino-shimmer shrink-0">
+              <BrandLogo size={38} className="casino-spin-target block" />
             </div>
             <div>
-              <div className="text-sm font-extrabold tracking-tight flex items-center gap-1" style={{ color: 'var(--text-primary)' }}>
-                <span>Scout CRM</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold">
-                  BET
+              <div className="text-sm font-extrabold tracking-tight flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                <span>Jackpot CRM</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/35 font-extrabold tracking-wide">
+                  VIP
                 </span>
               </div>
               <div className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                v3.0 • Mesa de Afiliados 🎲
+                Afiliados & Publis .bet.br 🎲
               </div>
             </div>
           </div>

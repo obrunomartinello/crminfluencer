@@ -373,6 +373,11 @@ export default function App() {
 
   const activeHeader = TAB_HEADERS[currentTab] || TAB_HEADERS.dashboard
 
+  useEffect(() => {
+    const shortTitle = activeHeader.title.split(' — ')[0]
+    document.title = `${shortTitle} | Jackpot CRM`
+  }, [activeHeader.title])
+
   return (
     <div
       className="min-h-screen font-inter transition-colors duration-200 flex"

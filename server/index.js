@@ -40,7 +40,7 @@ app.get('/api/cron/keepalive', handleKeepalive)
 const PORT = process.env.PORT || 3001
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`🚀 Scout CRM Server rodando na porta ${PORT}`)
+    console.log(`🎰 Jackpot CRM Server rodando na porta ${PORT}`)
   })
 }
 
