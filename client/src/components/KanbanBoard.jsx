@@ -2,63 +2,60 @@ import React, { useState } from 'react'
 import {
   ExternalLink,
   MessageCircle,
-  Send,
   AtSign,
   Edit3,
   ArrowRight,
   AlertTriangle,
-  Sparkles,
-  CheckCircle2,
-  DollarSign,
   Archive,
 } from 'lucide-react'
 
 const COLUMNS = [
   {
     id: 'to_contact',
-    title: 'Para Abordar',
-    subtitle: 'Leads novos (1º contato)',
+    title: '🎯 Para Abordar',
+    subtitle: 'Leads novos (1ª ficha)',
     targetStatus: 'Novo',
-    dotClass: 'bg-sky-500',
-    badgeClass: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20',
+    dotClass: 'bg-amber-500',
+    badgeClass: 'bg-amber-500/12 text-amber-700 dark:text-amber-300 border-amber-500/25',
     match: (st) => !st || st === 'Novo',
   },
   {
     id: 'sent_waiting',
-    title: 'Msg Enviada',
+    title: '🚀 Msg Enviada',
     subtitle: 'Já mandados aguardando',
     targetStatus: 'Mensagem Enviada',
-    dotClass: 'bg-blue-600',
-    badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+    dotClass: 'bg-indigo-600',
+    badgeClass: 'bg-indigo-500/12 text-indigo-700 dark:text-indigo-300 border-indigo-500/25',
     match: (st) => st === 'Mensagem Enviada' || st === 'Sem resposta',
   },
   {
     id: 'negotiating',
-    title: 'Em Negociação',
+    title: '🃏 Em Negociação',
     subtitle: 'Pedir Stories & fechar valor',
     targetStatus: 'Em negociação',
-    dotClass: 'bg-purple-500',
-    badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+    dotClass: 'bg-purple-600',
+    badgeClass: 'bg-purple-500/12 text-purple-700 dark:text-purple-300 border-purple-500/25',
     match: (st) => st === 'Em negociação' || st === 'Abordado',
   },
   {
     id: 'closed',
-    title: 'Fechou',
+    title: '🏆 Fechou (Jackpot)',
     subtitle: 'Prontos para Publicidade',
     targetStatus: 'Fechou',
     dotClass: 'bg-emerald-500',
-    badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+    badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/35',
+    isJackpot: true,
     match: (st) => st === 'Fechou' || st === 'Fechado',
   },
 ]
 
 const REMARKETING_COL = {
   id: 'remarketing',
-  title: 'Remarketing / Recusados',
+  title: '♻️ Remarketing / Recusados',
   subtitle: 'Retomar depois ou arquivados',
   targetStatus: 'Recusado - Remarketing',
-  dotClass: 'bg-amber-500',
-  badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+  dotClass: 'bg-rose-500',
+  badgeClass: 'bg-rose-500/12 text-rose-700 dark:text-rose-300 border-rose-500/25',
   match: (st) =>
     ['Recusado - Remarketing', 'Outro momento', 'Não interessado', 'Recusado - métricas ruins'].includes(st),
 }
@@ -110,13 +107,26 @@ export default function KanbanBoard({
   const getClsPill = (cls) => {
     switch (cls) {
       case 'OURO':
-        return 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30'
+        return 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40'
       case 'PRATA':
         return 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-400/30'
       case 'BRONZE':
         return 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30'
       default:
-        return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+    }
+  }
+
+  const getClsLabel = (cls) => {
+    switch (cls) {
+      case 'OURO':
+        return '💎 OURO'
+      case 'PRATA':
+        return '🥈 PRATA'
+      case 'BRONZE':
+        return '🥉 BRONZE'
+      default:
+        return cls || '—'
     }
   }
 
@@ -126,9 +136,12 @@ export default function KanbanBoard({
         className="rounded-2xl border p-12 text-center"
         style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
       >
-        <div className="animate-spin w-7 h-7 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Organizando quadro Kanban...
+        <div className="text-3xl casino-slot-bounce mb-2 select-none" aria-hidden="true">
+          🎰
+        </div>
+        <div className="animate-spin w-6 h-6 border-3 border-emerald-500 border-t-amber-400 rounded-full mx-auto mb-3" />
+        <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+          Embaralhando cartas e carregando mesa Kanban...
         </p>
       </div>
     )
@@ -145,19 +158,19 @@ export default function KanbanBoard({
         }}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-bold text-[11px] uppercase tracking-wider text-blue-600 dark:text-blue-400">
-            Fluxo diário:
+          <span className="font-extrabold text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <span>🎰</span> Fluxo da Mesa:
           </span>
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300">
-            1. Pegue em Para Abordar
-          </span>
-          <ArrowRight size={12} style={{ color: 'var(--text-muted)' }} />
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
-            2. Mande Whats/DM e clique "Já Mandei Msg"
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/12 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+            🎯 1. Pegue em Para Abordar
           </span>
           <ArrowRight size={12} style={{ color: 'var(--text-muted)' }} />
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-300">
-            3. Clique em "Ficha" para preencher Views e Preço
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+            🚀 2. Mande Whats/DM e clique "Já Mandei Msg"
+          </span>
+          <ArrowRight size={12} style={{ color: 'var(--text-muted)' }} />
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-500/12 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+            🃏 3. Clique em "Ficha" p/ Views e Preço
           </span>
         </div>
 
@@ -166,7 +179,7 @@ export default function KanbanBoard({
           onClick={() => setShowRemarketing((prev) => !prev)}
           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border text-[11px] font-semibold transition-all ${
             showRemarketing
-              ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-300'
+              ? 'bg-rose-500/15 border-rose-500/40 text-rose-600 dark:text-rose-300'
               : 'hover:bg-zinc-500/10'
           }`}
           style={{
@@ -176,7 +189,7 @@ export default function KanbanBoard({
         >
           <Archive size={12} />
           <span>
-            {showRemarketing ? 'Ocultar' : 'Mostrar'} Remarketing / Recusados ({remarketingCount})
+            {showRemarketing ? 'Ocultar' : '♻️ Mostrar'} Remarketing / Recusados ({remarketingCount})
           </span>
         </button>
       </div>
@@ -192,7 +205,7 @@ export default function KanbanBoard({
               type="button"
               onClick={() => setMobileColId(col.id)}
               className={`px-3 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 ${
-                isActive ? 'bg-blue-600 text-white border-transparent' : ''
+                isActive ? 'casino-btn-vegas border-transparent' : ''
               }`}
               style={{
                 backgroundColor: isActive ? undefined : 'var(--bg-card)',
@@ -228,19 +241,23 @@ export default function KanbanBoard({
               onDragLeave={() => setDragOverCol(null)}
               onDrop={(e) => handleDrop(e, col)}
               className={`${hiddenOnMobile} flex-col rounded-2xl border p-3 transition-all min-h-[420px] max-h-[72vh] ${
-                isDragOver ? 'ring-2 ring-blue-500 border-blue-500' : ''
+                isDragOver ? 'ring-2 ring-emerald-500 border-emerald-500' : ''
               }`}
               style={{
-                backgroundColor: 'var(--bg-card-secondary)',
-                borderColor: isDragOver ? undefined : 'var(--border-color)',
+                backgroundColor: col.isJackpot ? 'rgba(16, 185, 129, 0.04)' : 'var(--bg-card-secondary)',
+                borderColor: isDragOver
+                  ? undefined
+                  : col.isJackpot
+                    ? 'rgba(16, 185, 129, 0.35)'
+                    : 'var(--border-color)',
               }}
             >
               {/* Cabeçalho da Coluna */}
               <div className="flex items-center justify-between gap-2 px-1 pb-3 border-b mb-3" style={{ borderColor: 'var(--border-color)' }}>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${col.dotClass}`} />
-                    <h3 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${col.dotClass} ${col.isJackpot ? 'casino-jackpot-ring' : ''}`} />
+                    <h3 className="text-xs font-extrabold" style={{ color: 'var(--text-primary)' }}>
                       {col.title}
                     </h3>
                   </div>
@@ -266,12 +283,12 @@ export default function KanbanBoard({
                   >
                     <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                       {col.id === 'to_contact'
-                        ? 'Fila zerada!'
-                        : 'Nenhum lead nesta etapa'}
+                        ? '🎰 Fila zerada!'
+                        : '🎲 Nenhum lead nesta etapa'}
                     </p>
                     <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                       {col.id === 'to_contact'
-                        ? 'Todos os leads já foram mandados ou você pode minerar mais criadores.'
+                        ? 'Todos os leads já foram mandados ou você pode girar a roleta e minerar mais criadores.'
                         : 'Arraste um card para cá ou use o botão de avanço no card.'}
                     </p>
                     {col.id === 'to_contact' && (
@@ -280,9 +297,9 @@ export default function KanbanBoard({
                           <button
                             type="button"
                             onClick={onMineClick}
-                            className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold"
+                            className="casino-btn-vegas casino-shimmer inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold"
                           >
-                            <Sparkles size={12} />
+                            <span>🎰</span>
                             <span>Minerar Novos Leads</span>
                           </button>
                         )}
@@ -293,7 +310,7 @@ export default function KanbanBoard({
                             className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl border text-[11px] font-semibold"
                             style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                           >
-                            <Send size={11} />
+                            <span>🚀</span>
                             <span>Ver Já Mandados</span>
                           </button>
                         )}
@@ -315,10 +332,12 @@ export default function KanbanBoard({
                         key={inf.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, inf.id)}
-                        className="rounded-xl border p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing space-y-2.5"
+                        className={`casino-card-enter rounded-xl border p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing space-y-2.5 ${
+                          col.isJackpot ? 'border-emerald-500/40' : ''
+                        }`}
                         style={{
                           backgroundColor: 'var(--bg-card)',
-                          borderColor: 'var(--border-color)',
+                          borderColor: col.isJackpot ? 'rgba(16, 185, 129, 0.4)' : 'var(--border-color)',
                         }}
                       >
                         {/* Identidade */}
@@ -331,7 +350,7 @@ export default function KanbanBoard({
                               className="w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-bold shrink-0 overflow-hidden"
                               style={{
                                 backgroundColor: 'var(--bg-card-secondary)',
-                                borderColor: 'var(--border-color)',
+                                borderColor: col.isJackpot ? 'rgba(16, 185, 129, 0.5)' : 'var(--border-color)',
                                 color: 'var(--text-muted)',
                               }}
                             >
@@ -351,14 +370,14 @@ export default function KanbanBoard({
 
                             <div className="min-w-0">
                               <div className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-                                {inf.full_name || inf.username}
+                                {col.isJackpot ? `🏆 ${inf.full_name || inf.username}` : (inf.full_name || inf.username)}
                               </div>
                               <a
                                 href={`https://instagram.com/${inf.username}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-[11px] text-blue-500 hover:underline inline-flex items-center gap-0.5 truncate max-w-full"
+                                className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-0.5 truncate max-w-full font-medium"
                               >
                                 @{inf.username}
                                 <ExternalLink size={9} />
@@ -366,8 +385,8 @@ export default function KanbanBoard({
                             </div>
                           </div>
 
-                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold border shrink-0 ${getClsPill(inf.classification)}`}>
-                            {inf.classification} {inf.score}
+                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold border shrink-0 ${getClsPill(inf.classification)}`}>
+                            {getClsLabel(inf.classification)} {inf.score}
                           </span>
                         </div>
 
@@ -377,22 +396,22 @@ export default function KanbanBoard({
                             className="px-1.5 py-0.5 rounded font-semibold"
                             style={{ backgroundColor: 'var(--bg-card-secondary)', color: 'var(--text-primary)' }}
                           >
-                            {formatCompact(inf.followers_count)} seg
+                            🎲 {formatCompact(inf.followers_count)} seg
                           </span>
                           <span
                             className="px-1.5 py-0.5 rounded font-semibold"
                             style={{ backgroundColor: 'var(--bg-card-secondary)', color: 'var(--text-primary)' }}
                           >
-                            {formatCompact(inf.avg_reels_views)} views
+                            👁️ {formatCompact(inf.avg_reels_views)} views
                           </span>
                           {inf.followers_count >= 15000 && (
-                            <span className="px-1.5 py-0.5 rounded font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                              15k+
+                            <span className="px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                              🔥 15k+
                             </span>
                           )}
                           {inf.outreach_channel && (
-                            <span className="px-1.5 py-0.5 rounded font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                              {inf.outreach_channel === 'whatsapp' ? 'Whats' : 'Direct'}
+                            <span className="px-1.5 py-0.5 rounded font-semibold bg-emerald-500/12 text-emerald-700 dark:text-emerald-400">
+                              {inf.outreach_channel === 'whatsapp' ? '💬 Whats' : '📩 Direct'}
                               {sentDate ? ` • ${sentDate}` : ''}
                             </span>
                           )}
@@ -427,8 +446,8 @@ export default function KanbanBoard({
                         {/* Botões Explícitos de Ação no Card */}
                         {isPicking ? (
                           <div className="pt-1 space-y-1.5">
-                            <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-                              Por onde mandou mensagem?
+                            <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                              🎲 Por onde disparou a mensagem?
                             </div>
                             <div className="flex gap-1.5">
                               <button
@@ -448,7 +467,7 @@ export default function KanbanBoard({
                                   setPickingChannelForId(null)
                                   await onMarkSent(inf, 'instagram')
                                 }}
-                                className="flex-1 py-1 px-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-bold flex items-center justify-center gap-1"
+                                className="flex-1 py-1 px-2 rounded-lg bg-gradient-to-r from-fuchsia-600 to-rose-500 hover:brightness-110 text-white text-[10px] font-bold flex items-center justify-center gap-1"
                               >
                                 <AtSign size={11} />
                                 <span>Direct IG</span>
@@ -461,9 +480,9 @@ export default function KanbanBoard({
                               <button
                                 type="button"
                                 onClick={() => setPickingChannelForId(inf.id)}
-                                className="flex-1 py-1 px-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center gap-1"
+                                className="casino-btn-vegas casino-hover-spin flex-1 py-1 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1"
                               >
-                                <Send size={10} />
+                                <span className="casino-spin-target">🚀</span>
                                 <span>Já Mandei Msg</span>
                               </button>
                             )}
@@ -472,9 +491,9 @@ export default function KanbanBoard({
                               <button
                                 type="button"
                                 onClick={() => onStatusChange(inf.id, 'Em negociação')}
-                                className="flex-1 py-1 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold flex items-center justify-center gap-1"
+                                className="casino-hover-spin flex-1 py-1 px-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white text-[10px] font-bold flex items-center justify-center gap-1"
                               >
-                                <ArrowRight size={10} />
+                                <span className="casino-spin-target">🃏</span>
                                 <span>Respondeu</span>
                               </button>
                             )}
@@ -483,10 +502,10 @@ export default function KanbanBoard({
                               <button
                                 type="button"
                                 onClick={() => onStatusChange(inf.id, 'Fechou')}
-                                className="flex-1 py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center gap-1"
+                                className="casino-btn-vegas casino-shimmer casino-hover-spin flex-1 py-1 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1"
                               >
-                                <CheckCircle2 size={10} />
-                                <span>Fechou</span>
+                                <span className="casino-spin-target">🏆</span>
+                                <span>Fechou Jackpot</span>
                               </button>
                             )}
 
@@ -494,9 +513,9 @@ export default function KanbanBoard({
                               <button
                                 type="button"
                                 onClick={() => onCreatePublicidadeForInfluencer(inf)}
-                                className="flex-1 py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center gap-1"
+                                className="casino-btn-gold casino-shimmer flex-1 py-1 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1"
                               >
-                                <DollarSign size={10} />
+                                <span>💰</span>
                                 <span>Lançar Publi</span>
                               </button>
                             )}
@@ -505,9 +524,9 @@ export default function KanbanBoard({
                               <button
                                 type="button"
                                 onClick={() => onStatusChange(inf.id, 'Em negociação')}
-                                className="flex-1 py-1 px-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold"
+                                className="flex-1 py-1 px-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold"
                               >
-                                Retomar
+                                🔄 Retomar
                               </button>
                             )}
 
@@ -526,7 +545,7 @@ export default function KanbanBoard({
                             <button
                               type="button"
                               onClick={() => onSelectInfluencer(inf)}
-                              className="py-1 px-2 rounded-lg border text-[10px] font-semibold flex items-center gap-1 hover:border-blue-500/50"
+                              className="py-1 px-2 rounded-lg border text-[10px] font-semibold flex items-center gap-1 hover:border-emerald-500/50"
                               style={{
                                 backgroundColor: 'var(--bg-card-secondary)',
                                 borderColor: 'var(--border-color)',

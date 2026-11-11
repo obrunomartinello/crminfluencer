@@ -15,12 +15,9 @@ import MetasView from './components/MetasView'
 import ImportView from './components/ImportView'
 import ApifyThermometer from './components/ApifyThermometer'
 import {
-  Sparkles,
   Sun,
   Moon,
   AlertCircle,
-  UserPlus,
-  DollarSign,
   Menu,
   Columns3,
   List,
@@ -28,27 +25,27 @@ import {
 
 const TAB_HEADERS = {
   dashboard: {
-    title: 'Dashboard',
-    subtitle: 'Visão geral da captação SDR, envios e retorno financeiro',
+    title: '🎰 Dashboard da Casa',
+    subtitle: 'Placar ao vivo da captação SDR, envios e lucro das apostas',
   },
   kanban: {
-    title: 'CRM Kanban',
-    subtitle: 'Trabalhe os leads em colunas: Para Abordar → Msg Enviada → Negociando → Fechou',
+    title: '🃏 CRM Kanban — Mesa de Prospecção',
+    subtitle: 'Puxe na fila: 🎯 Para Abordar → 🚀 Msg Enviada → 🃏 Negociando → 🏆 Fechou',
   },
   sent: {
-    title: 'Já Mandados',
-    subtitle: 'Painel exclusivo de criadores que já receberam mensagem e follow-ups',
+    title: '🚀 Painel Já Mandados',
+    subtitle: 'Acompanhamento exclusivo de mensagens disparadas, respostas e follow-ups',
   },
   publicidades: {
-    title: 'Publicidades',
-    subtitle: 'Controle de pagamentos, entregas e ROI por campanha',
+    title: '💰 Controle de Publicidades',
+    subtitle: 'Gestão de banca, pagamentos, Stories e ROI das campanhas',
   },
   metas: {
-    title: 'Metas de Depositantes',
-    subtitle: 'Acompanhamento de depositantes batidos vs. meta combinada',
+    title: '🏆 Metas de Depositantes',
+    subtitle: 'Placar de depositantes batidos vs. meta combinada',
   },
   importar: {
-    title: 'Planilhas',
+    title: '📋 Planilhas & Backup',
     subtitle: 'Importação e exportação em CSV e Excel',
   },
 }
@@ -446,14 +443,14 @@ export default function App() {
                     ? `Supabase conectado e ativo (${dbStatus.count ?? 0} registros${dbStatus.latencyMs ? ` • ${dbStatus.latencyMs}ms` : ''})`
                     : 'Supabase em pausa/offline — leads minerados protegidos no cache local e memória'
                 }
-                className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                   dbStatus.online
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                    ? 'bg-emerald-500/12 border-emerald-500/35 text-emerald-700 dark:text-emerald-400'
+                    : 'bg-amber-500/12 border-amber-500/35 text-amber-700 dark:text-amber-400'
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.online ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                <span>{dbStatus.online ? 'DB Online' : 'Modo Local'}</span>
+                <span className={`w-2 h-2 rounded-full ${dbStatus.online ? 'bg-emerald-500 casino-jackpot-ring' : 'bg-amber-500'}`} />
+                <span>{dbStatus.online ? '🟢 Casa Online' : '🟡 Modo Local'}</span>
               </span>
             )}
 
@@ -478,19 +475,19 @@ export default function App() {
             <button
               type="button"
               onClick={() => setCreateModalOpen(true)}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-sm active:scale-95 transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-sm active:scale-95 transition-all"
             >
-              <UserPlus size={14} />
+              <span>🪙</span>
               <span>+ Novo Lead</span>
             </button>
 
             <button
               type="button"
               onClick={() => setMineModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-sm active:scale-95 transition-all"
+              className="casino-btn-vegas casino-shimmer casino-hover-spin inline-flex items-center gap-1.5 px-4 py-1.5 font-bold text-xs rounded-xl active:scale-95"
             >
-              <Sparkles size={14} />
-              <span>Minerar</span>
+              <span className="casino-spin-target">🎰</span>
+              <span>Minerar Leads</span>
             </button>
 
             {currentTab === 'publicidades' && (
@@ -500,9 +497,9 @@ export default function App() {
                   setPubliInitialData({})
                   setCreatePubliModalOpen(true)
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-xs rounded-xl shadow-sm active:scale-95 transition-all"
+                className="casino-btn-gold inline-flex items-center gap-1.5 px-3 py-1.5 font-bold text-xs rounded-xl shadow-sm active:scale-95 transition-all"
               >
-                <DollarSign size={14} />
+                <span>💰</span>
                 <span>+ Nova Publi</span>
               </button>
             )}
@@ -556,23 +553,23 @@ export default function App() {
                     type="button"
                     onClick={() => handleToggleKanbanMode('board')}
                     className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
-                      kanbanMode === 'board' ? 'bg-blue-600 text-white shadow-sm' : ''
+                      kanbanMode === 'board' ? 'casino-btn-vegas shadow-sm' : ''
                     }`}
                     style={{ color: kanbanMode === 'board' ? undefined : 'var(--text-muted)' }}
                   >
                     <Columns3 size={13} />
-                    <span>Visual Kanban</span>
+                    <span>🎰 Visual Kanban</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleToggleKanbanMode('table')}
                     className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
-                      kanbanMode === 'table' ? 'bg-blue-600 text-white shadow-sm' : ''
+                      kanbanMode === 'table' ? 'casino-btn-vegas shadow-sm' : ''
                     }`}
                     style={{ color: kanbanMode === 'table' ? undefined : 'var(--text-muted)' }}
                   >
                     <List size={13} />
-                    <span>Lista / Tabela ({total})</span>
+                    <span>📋 Lista / Tabela ({total})</span>
                   </button>
                 </div>
 

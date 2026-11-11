@@ -67,3 +67,157 @@ select, button, input, textarea {
 select:focus, input:focus, textarea:focus {
   outline: none;
 }
+
+/* ===========================
+   Tema Cassino / .bet.br
+   =========================== */
+@keyframes casinoShimmer {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+
+@keyframes casinoFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(4deg);
+  }
+}
+
+@keyframes casinoDiceSpin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  35% {
+    transform: rotate(-16deg) scale(1.15);
+  }
+  70% {
+    transform: rotate(18deg) scale(1.12);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes casinoJackpotPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.28), 0 4px 14px -2px rgba(245, 158, 11, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(16, 185, 129, 0), 0 6px 20px -2px rgba(245, 158, 11, 0.34);
+  }
+}
+
+@keyframes casinoCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes casinoSlotBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-5px) scale(1.12);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.18s ease-out both;
+}
+
+.casino-float {
+  display: inline-block;
+  animation: casinoFloat 3.2s ease-in-out infinite;
+}
+
+.casino-slot-bounce {
+  display: inline-block;
+  animation: casinoSlotBounce 0.85s ease-in-out infinite;
+}
+
+.casino-hover-spin:hover .casino-spin-target,
+.group:hover .casino-spin-target {
+  animation: casinoDiceSpin 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.casino-card-enter {
+  animation: casinoCardEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.casino-jackpot-ring {
+  animation: casinoJackpotPulse 2.4s ease-in-out infinite;
+}
+
+.casino-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.casino-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.28),
+    rgba(253, 224, 71, 0.32),
+    transparent
+  );
+  transform: translateX(-140%) skewX(-18deg);
+  animation: casinoShimmer 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.casino-btn-vegas {
+  background: linear-gradient(135deg, #059669 0%, #10B981 55%, #D97706 115%);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px -2px rgba(5, 150, 105, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.casino-btn-vegas:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 18px -2px rgba(16, 185, 129, 0.45), 0 0 0 1px rgba(251, 191, 36, 0.35);
+}
+
+.casino-btn-gold {
+  background: linear-gradient(135deg, #D97706 0%, #F59E0B 60%, #EAB308 100%);
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px -2px rgba(217, 119, 6, 0.32);
+}
+.casino-btn-gold:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.casino-felt-box {
+  background: linear-gradient(135deg, #064E3B 0%, #0F172A 65%, #1E1B4B 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 14px -4px rgba(6, 78, 59, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .casino-float,
+  .casino-slot-bounce,
+  .casino-jackpot-ring,
+  .casino-shimmer::after,
+  .casino-card-enter {
+    animation: none !important;
+  }
+}

@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
   X,
-  Sparkles,
   Loader2,
-  CheckCircle2,
   AlertCircle,
   Search,
   ShieldCheck,
   Zap,
-  Radio,
   Flame,
   UserSearch,
   Layers,
@@ -203,12 +200,12 @@ export default function MineModal({
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-4 shrink-0">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
-            <Sparkles size={20} />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-amber-500 text-white flex items-center justify-center text-lg shadow-sm casino-shimmer">
+            <span className="casino-float select-none" aria-hidden="true">🎰</span>
           </div>
           <div>
-            <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-              Motor de Descoberta de Criadores v2.1
+            <h3 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>
+              🎰 Roleta de Descoberta de Criadores v2.1
             </h3>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Busca em 2 fases: descobre Reels/perfis ao vivo e extrai seguidores, bio e WhatsApp
@@ -247,8 +244,8 @@ export default function MineModal({
                     disabled={loading}
                     className="text-left p-2.5 rounded-xl border transition-all text-xs"
                     style={{
-                      backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card-secondary)',
-                      borderColor: isSelected ? '#3B82F6' : 'var(--border-color)',
+                      backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-card-secondary)',
+                      borderColor: isSelected ? '#10B981' : 'var(--border-color)',
                     }}
                   >
                     <div className="flex items-center justify-between gap-1 mb-1">
@@ -280,8 +277,8 @@ export default function MineModal({
                       onClick={() => setQuery(kw)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
                         active
-                          ? 'bg-blue-600 text-white border-blue-500'
-                          : 'hover:border-blue-400'
+                          ? 'casino-btn-vegas border-transparent'
+                          : 'hover:border-emerald-400'
                       }`}
                       style={
                         !active
@@ -306,27 +303,27 @@ export default function MineModal({
             <div
               className="p-4 rounded-xl border space-y-2"
               style={{
-                backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                borderColor: 'rgba(59, 130, 246, 0.3)',
+                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                borderColor: 'rgba(16, 185, 129, 0.35)',
               }}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-semibold text-blue-500">
-                  <Radio size={14} className="animate-spin" />
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="casino-slot-bounce text-base leading-none">🎰</span>
                   <span>
-                    Fase {stageInfo.stage}/2 — Varredura Apify ({elapsedSecs}s)
+                    Fase {stageInfo.stage}/2 — Roleta Apify girando ({elapsedSecs}s)
                   </span>
                 </div>
-                <span className="text-[10px] text-blue-500 font-semibold">
-                  {stageInfo.stage === 1 ? 'Descoberta' : 'Enriquecimento'}
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                  {stageInfo.stage === 1 ? '🎲 Descoberta' : '💎 Enriquecimento'}
                 </span>
               </div>
               <p className="text-xs" style={{ color: 'var(--text-primary)' }}>
                 {stageInfo.label || `Buscando criadores para "${query}"...`}
               </p>
-              <div className="w-full h-1.5 bg-blue-500/20 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-emerald-500/20 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-500 transition-all duration-500"
                   style={{
                     width: stageInfo.stage === 1
                       ? `${Math.min(15 + elapsedSecs * 4, 48)}%`
@@ -339,16 +336,16 @@ export default function MineModal({
 
           {/* Rich Results Card */}
           {result && (
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
-              <div className="flex items-start gap-2 text-emerald-600 dark:text-emerald-400 text-xs">
-                <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/35 rounded-xl space-y-3 casino-jackpot-ring">
+              <div className="flex items-start gap-2 text-emerald-700 dark:text-emerald-300 text-xs">
+                <span className="text-base leading-none shrink-0">🏆</span>
                 <div>
                   {result.message ? (
                     <span>{result.message}</span>
                   ) : (
                     <span>
-                      Varredura concluída! <strong>{result.newCount}</strong> novos criadores descobertos
-                      {result.updatedCount > 0 ? ` (+${result.updatedCount} atualizados)` : ''} e colocados no topo da tabela.
+                      <strong>Jackpot!</strong> <strong>{result.newCount}</strong> novos criadores descobertos
+                      {result.updatedCount > 0 ? ` (+${result.updatedCount} atualizados)` : ''} e colocados no topo da fila!
                     </span>
                   )}
                 </div>
@@ -419,12 +416,12 @@ export default function MineModal({
                       onClick={() => setMode(m.id)}
                       className="p-2 rounded-xl border text-left transition-all"
                       style={{
-                        backgroundColor: selected ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card-secondary)',
-                        borderColor: selected ? '#3B82F6' : 'var(--border-color)',
+                        backgroundColor: selected ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-card-secondary)',
+                        borderColor: selected ? '#10B981' : 'var(--border-color)',
                       }}
                     >
                       <div className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        <Icon size={12} className={selected ? 'text-blue-500' : 'text-zinc-400'} />
+                        <Icon size={12} className={selected ? 'text-emerald-500' : 'text-zinc-400'} />
                         <span className="truncate">{m.label}</span>
                       </div>
                       <p className="text-[9px] mt-0.5 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
@@ -464,7 +461,7 @@ export default function MineModal({
                 <label className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                   Quantidade de Perfis a Extrair
                 </label>
-                <span className="text-xs font-bold text-blue-500">até {count} criadores</span>
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">🎲 até {count} criadores</span>
               </div>
               <input
                 type="range"
@@ -474,7 +471,7 @@ export default function MineModal({
                 value={count}
                 onChange={(e) => setCount(Number(e.target.value))}
                 disabled={loading}
-                className="w-full accent-blue-600 cursor-pointer"
+                className="w-full accent-emerald-600 cursor-pointer"
               />
               <div className="flex justify-between text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 <span>5 perfis (rápido)</span>
@@ -527,7 +524,7 @@ export default function MineModal({
               <button
                 type="submit"
                 disabled={loading || !query.trim()}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-medium text-xs rounded-xl shadow-md shadow-blue-500/25 active:scale-95 transition-all"
+                className="casino-btn-vegas casino-shimmer casino-hover-spin flex items-center gap-2 px-5 py-2 disabled:opacity-50 text-white font-bold text-xs rounded-xl active:scale-95 transition-all"
               >
                 {loading ? (
                   <>
@@ -536,8 +533,8 @@ export default function MineModal({
                   </>
                 ) : (
                   <>
-                    <Sparkles size={14} />
-                    <span>Iniciar Varredura</span>
+                    <span className="casino-spin-target">🎰</span>
+                    <span>Girar Roleta & Minerar</span>
                   </>
                 )}
               </button>

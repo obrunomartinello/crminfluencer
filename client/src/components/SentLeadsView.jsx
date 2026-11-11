@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  Send,
-  Clock,
-  CheckCircle2,
   RefreshCw,
   MessageCircle,
   AtSign,
   Edit3,
   Search,
   ExternalLink,
-  Archive,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { PEDRO_STATUSES } from '../constants/nichePresets'
@@ -87,11 +83,11 @@ export default function SentLeadsView({
     (statusCounts['Recusado - métricas ruins'] || 0)
 
   const stageChips = [
-    { id: '', label: `Todos Enviados (${sentTotalCount})` },
-    { id: 'Aguardando', label: `Aguardando Resposta (${sentWaitingCount})` },
-    { id: 'Em negociação', label: `Em Negociação (${statusCounts['Em negociação'] || 0})` },
-    { id: 'Fechou', label: `Fechou (${statusCounts['Fechou'] || 0})` },
-    { id: 'Recusados', label: `Remarketing / Recusados (${remarketingCount})` },
+    { id: '', label: `🎲 Todos Enviados (${sentTotalCount})` },
+    { id: 'Aguardando', label: `⏳ Aguardando Resposta (${sentWaitingCount})` },
+    { id: 'Em negociação', label: `🃏 Em Negociação (${statusCounts['Em negociação'] || 0})` },
+    { id: 'Fechou', label: `🏆 Fechou (${statusCounts['Fechou'] || 0})` },
+    { id: 'Recusados', label: `♻️ Remarketing / Recusados (${remarketingCount})` },
   ]
 
   const handleInlineStatus = async (inf, nextStatus) => {
@@ -118,38 +114,38 @@ export default function SentLeadsView({
       {/* 4 Mini-Cards de Resumo dos Já Mandados */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div
-          className="rounded-2xl p-4 border flex flex-col justify-between"
+          className="casino-card-enter rounded-2xl p-4 border flex flex-col justify-between"
           style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
               Total Já Mandados
             </span>
-            <span className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Send size={15} />
+            <span className="w-8 h-8 rounded-xl bg-indigo-500/12 border border-indigo-500/25 flex items-center justify-center text-sm">
+              🚀
             </span>
           </div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
             {sentTotalCount}
           </div>
           <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
-            {channelCounts.whatsapp || 0} Whats • {channelCounts.instagram || 0} Direct IG
+            💬 {channelCounts.whatsapp || 0} Whats • 📩 {channelCounts.instagram || 0} Direct IG
           </div>
         </div>
 
         <div
-          className="rounded-2xl p-4 border flex flex-col justify-between"
+          className="casino-card-enter rounded-2xl p-4 border flex flex-col justify-between"
           style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
               Aguardando Resposta
             </span>
-            <span className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <Clock size={15} />
+            <span className="w-8 h-8 rounded-xl bg-amber-500/12 border border-amber-500/25 flex items-center justify-center text-sm">
+              ⏳
             </span>
           </div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
             {sentWaitingCount}
           </div>
           <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -158,18 +154,18 @@ export default function SentLeadsView({
         </div>
 
         <div
-          className="rounded-2xl p-4 border flex flex-col justify-between"
-          style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+          className="casino-card-enter rounded-2xl p-4 border flex flex-col justify-between"
+          style={{ backgroundColor: 'var(--bg-card)', borderColor: 'rgba(16, 185, 129, 0.35)' }}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
               Responderam / Avançaram
             </span>
-            <span className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <CheckCircle2 size={15} />
+            <span className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-sm">
+              🏆
             </span>
           </div>
-          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+          <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
             {repliedCount}{' '}
             <span className="text-sm font-semibold">({responseRate}%)</span>
           </div>
@@ -179,18 +175,18 @@ export default function SentLeadsView({
         </div>
 
         <div
-          className="rounded-2xl p-4 border flex flex-col justify-between"
+          className="casino-card-enter rounded-2xl p-4 border flex flex-col justify-between"
           style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
               Remarketing & Recusas
             </span>
-            <span className="w-8 h-8 rounded-xl bg-zinc-500/10 text-zinc-500 flex items-center justify-center">
-              <Archive size={15} />
+            <span className="w-8 h-8 rounded-xl bg-rose-500/12 border border-rose-500/25 flex items-center justify-center text-sm">
+              ♻️
             </span>
           </div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
             {remarketingCount}
           </div>
           <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -214,8 +210,8 @@ export default function SentLeadsView({
                 onClick={() => setStatusFilter(chip.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                   active
-                    ? 'bg-blue-600 text-white border-transparent shadow-sm'
-                    : 'hover:bg-zinc-500/10'
+                    ? 'casino-btn-vegas border-transparent shadow-sm'
+                    : 'hover:bg-emerald-500/10'
                 }`}
                 style={{
                   backgroundColor: active ? undefined : 'var(--bg-card-secondary)',

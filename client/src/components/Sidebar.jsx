@@ -1,14 +1,5 @@
 import React from 'react'
-import {
-  LayoutDashboard,
-  Columns3,
-  Send,
-  DollarSign,
-  Target,
-  FileSpreadsheet,
-  Sparkles,
-  X,
-} from 'lucide-react'
+import { X } from 'lucide-react'
 
 export default function Sidebar({
   currentTab,
@@ -24,31 +15,30 @@ export default function Sidebar({
     {
       id: 'dashboard',
       label: 'Dashboard',
-      icon: LayoutDashboard,
+      emoji: '📊',
       badge: null,
     },
     {
       id: 'kanban',
       label: 'CRM Kanban',
-      icon: Columns3,
-      badge: toContactCount > 0 ? { text: `${toContactCount} novos`, tone: 'blue' } : null,
+      emoji: '🎰',
+      badge: toContactCount > 0 ? { text: `🎲 ${toContactCount} novos`, tone: 'vegas' } : null,
     },
     {
       id: 'sent',
       label: 'Já Mandados',
-      icon: Send,
-      badge: sentTotalCount > 0 ? { text: String(sentTotalCount), tone: 'neutral' } : null,
+      emoji: '🚀',
+      badge: sentTotalCount > 0 ? { text: String(sentTotalCount), tone: 'emerald' } : null,
     },
   ]
 
   const opsNav = [
-    { id: 'publicidades', label: 'Publicidades', icon: DollarSign },
-    { id: 'metas', label: 'Metas', icon: Target },
-    { id: 'importar', label: 'Planilhas', icon: FileSpreadsheet },
+    { id: 'publicidades', label: 'Publicidades', emoji: '💰' },
+    { id: 'metas', label: 'Metas', emoji: '🏆' },
+    { id: 'importar', label: 'Planilhas', emoji: '📋' },
   ]
 
   const renderItem = (item) => {
-    const Icon = item.icon
     const active = currentTab === item.id
     return (
       <button
@@ -58,27 +48,31 @@ export default function Sidebar({
           onSelectTab(item.id)
           if (onCloseMobile) onCloseMobile()
         }}
-        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+        className={`casino-hover-spin w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
           active
-            ? 'bg-white dark:bg-zinc-800 shadow-sm border'
-            : 'hover:bg-black/5 dark:hover:bg-white/5 border border-transparent'
+            ? 'bg-gradient-to-r from-emerald-500/12 via-emerald-500/5 to-amber-500/10 dark:from-emerald-500/20 dark:to-amber-500/15 shadow-sm border'
+            : 'hover:bg-emerald-500/5 dark:hover:bg-white/5 border border-transparent'
         }`}
         style={{
-          borderColor: active ? 'var(--border-color)' : 'transparent',
+          borderColor: active ? 'rgba(16, 185, 129, 0.4)' : 'transparent',
           color: active ? 'var(--text-primary)' : 'var(--text-muted)',
         }}
       >
         <span className="flex items-center gap-2.5">
-          <Icon size={16} className={active ? 'text-blue-600 dark:text-blue-400' : ''} />
-          <span>{item.label}</span>
+          <span className="w-5 text-center text-sm leading-none casino-spin-target select-none" aria-hidden="true">
+            {item.emoji}
+          </span>
+          <span className={active ? 'text-emerald-700 dark:text-emerald-300 font-bold' : ''}>
+            {item.label}
+          </span>
         </span>
 
         {item.badge && (
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              item.badge.tone === 'blue'
-                ? 'bg-blue-600 text-white'
-                : 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-300'
+              item.badge.tone === 'vegas'
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm'
+                : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25'
             }`}
           >
             {item.badge.text}
@@ -90,19 +84,22 @@ export default function Sidebar({
 
   const content = (
     <div className="flex flex-col h-full p-4 space-y-5">
-      {/* Brand + Workspace Card estilo ZapData */}
+      {/* Brand + Workspace Card estilo Casa VIP .bet.br */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-sm text-white">
-              <Sparkles size={16} />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-amber-500 flex items-center justify-center shadow-md shadow-emerald-600/25 text-lg casino-shimmer">
+              <span className="casino-float select-none" aria-hidden="true">🎰</span>
             </div>
             <div>
-              <div className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                Scout CRM
+              <div className="text-sm font-extrabold tracking-tight flex items-center gap-1" style={{ color: 'var(--text-primary)' }}>
+                <span>Scout CRM</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold">
+                  BET
+                </span>
               </div>
               <div className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                v3.0 • Afiliados
+                v3.0 • Mesa de Afiliados 🎲
               </div>
             </div>
           </div>
@@ -119,18 +116,13 @@ export default function Sidebar({
           )}
         </div>
 
-        <div
-          className="p-2.5 rounded-xl border text-xs"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            borderColor: 'var(--border-color)',
-          }}
-        >
-          <div className="font-semibold text-[11px]" style={{ color: 'var(--text-primary)' }}>
-            Operação Pedro (.bet.br)
+        <div className="casino-felt-box p-3 rounded-xl text-xs text-white">
+          <div className="font-bold text-[11px] flex items-center justify-between gap-1 text-amber-300">
+            <span>🃏 Operação Pedro (.bet.br)</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 casino-jackpot-ring shrink-0" />
           </div>
-          <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            4 jogos • Funil SDR + Publis
+          <div className="text-[10px] mt-0.5 text-emerald-100/80">
+            4 jogos • Funil SDR + Publis 💰
           </div>
         </div>
       </div>
@@ -138,21 +130,21 @@ export default function Sidebar({
       {/* Menu Groups */}
       <div className="flex-1 space-y-5 overflow-y-auto">
         <div className="space-y-1">
-          <div className="px-2 text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
-            Prospecção SDR
+          <div className="px-2 text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+            <span>🎯 Prospecção SDR</span>
           </div>
           {mainNav.map(renderItem)}
         </div>
 
         <div className="space-y-1">
-          <div className="px-2 text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
-            Operação & Dados
+          <div className="px-2 text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+            <span>🪙 Operação & Banca</span>
           </div>
           {opsNav.map(renderItem)}
         </div>
       </div>
 
-      {/* Mini legenda de status na sidebar */}
+      {/* Mini placar da mesa na sidebar */}
       <div
         className="p-3 rounded-xl border text-[11px] space-y-1.5"
         style={{
@@ -161,16 +153,17 @@ export default function Sidebar({
           color: 'var(--text-muted)',
         }}
       >
-        <div className="font-semibold text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-          Separação Rápida
+        <div className="font-bold text-[10px] uppercase tracking-wider flex items-center justify-between" style={{ color: 'var(--text-primary)' }}>
+          <span>🎲 Placar da Mesa</span>
+          <span className="text-emerald-600 dark:text-emerald-400">AO VIVO</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>Para abordar:</span>
-          <strong className="text-blue-600 dark:text-blue-400">{toContactCount}</strong>
+          <span>🎯 Para abordar:</span>
+          <strong className="text-amber-600 dark:text-amber-400">{toContactCount}</strong>
         </div>
         <div className="flex items-center justify-between">
-          <span>Já mandados:</span>
-          <strong style={{ color: 'var(--text-primary)' }}>{sentTotalCount}</strong>
+          <span>🚀 Já mandados:</span>
+          <strong className="text-emerald-600 dark:text-emerald-400">{sentTotalCount}</strong>
         </div>
       </div>
     </div>
