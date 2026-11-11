@@ -3,7 +3,6 @@ import { PEDRO_STATUSES } from '../constants/nichePresets'
 import {
   ExternalLink,
   Phone,
-  Eye,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
@@ -15,7 +14,7 @@ import {
   TrendingUp,
   TrendingDown,
   UserPlus,
-  MessageSquare,
+  Edit3,
 } from 'lucide-react'
 
 export default function InfluencerTable({
@@ -104,6 +103,8 @@ export default function InfluencerTable({
       case 'Recusado - métricas ruins':
       case 'Desqualificado':
         return 'bg-red-500/10 text-red-500 border-red-500/20'
+      case 'Mensagem Enviada':
+        return 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border-indigo-500/30'
       case 'Novo':
       default:
         return 'bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-500/30'
@@ -416,15 +417,16 @@ export default function InfluencerTable({
                         e.stopPropagation()
                         onSelectInfluencer(inf)
                       }}
-                      className="p-1.5 rounded-lg border transition-all inline-flex items-center justify-center hover:scale-105"
+                      className="px-2.5 py-1 rounded-lg border transition-all inline-flex items-center gap-1 text-[11px] font-semibold hover:border-blue-500/50"
                       style={{
                         backgroundColor: 'var(--bg-card-secondary)',
                         borderColor: 'var(--border-color)',
-                        color: 'var(--text-muted)',
+                        color: 'var(--text-primary)',
                       }}
-                      title="Abrir ficha, roteiros e ROI"
+                      title="Abrir ficha, preencher campos e copiar roteiros"
                     >
-                      <Eye size={14} />
+                      <Edit3 size={12} />
+                      <span>Ficha</span>
                     </button>
                   </td>
                 </tr>
