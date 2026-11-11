@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { api } from './lib/api'
-import KPICards from './components/KPICards'
+import Sidebar from './components/Sidebar'
+import DashboardView from './components/DashboardView'
+import KanbanBoard from './components/KanbanBoard'
+import SentLeadsView from './components/SentLeadsView'
 import FilterBar from './components/FilterBar'
 import InfluencerTable from './components/InfluencerTable'
 import InfluencerDrawer from './components/InfluencerDrawer'
@@ -17,19 +20,66 @@ import {
   Moon,
   AlertCircle,
   UserPlus,
-  Users,
   DollarSign,
-  Target,
-  FileSpreadsheet,
+  Menu,
+  Columns3,
+  List,
 } from 'lucide-react'
+
+const TAB_HEADERS = {
+  dashboard: {
+    title: 'Dashboard',
+    subtitle: 'Visão geral da captação SDR, envios e retorno financeiro',
+  },
+  kanban: {
+    title: 'CRM Kanban',
+    subtitle: 'Trabalhe os leads em colunas: Para Abordar → Msg Enviada → Negociando → Fechou',
+  },
+  sent: {
+    title: 'Já Mandados',
+    subtitle: 'Painel exclusivo de criadores que já receberam mensagem e follow-ups',
+  },
+  publicidades: {
+    title: 'Publicidades',
+    subtitle: 'Controle de pagamentos, entregas e ROI por campanha',
+  },
+  metas: {
+    title: 'Metas de Depositantes',
+    subtitle: 'Acompanhamento de depositantes batidos vs. meta combinada',
+  },
+  importar: {
+    title: 'Planilhas',
+    subtitle: 'Importação e exportação em CSV e Excel',
+  },
+}
+
+function updateCachedLead(updatedLead) {
+  if (!updatedLead?.username) return
+  try {
+    const raw = localStorage.getItem('scout_mined_cache_v2')
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return
+    const idx = parsed.findIndex((i) => i.username?.toLowerCase() === updatedLead.username.toLowerCase())
+    if (idx !== -1) {
+      parsed[idx] = { ...parsed[idx], ...updatedLead }
+      localStorage.setItem('scout_mined_cache_v2', JSON.stringify(parsed))
+    }
+  } catch {
+    // Ignora erro de localStorage
+  }
+}
 
 export default function App() {
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('scout_theme') || 'dark'
+    return localStorage.getItem('scout_theme_v3') || 'light'
   })
 
-  // Aba ativa: 'captacao' | 'publicidades' | 'metas' | 'importar'
-  const [currentTab, setCurrentTab] = useState('captacao')
+  // Navegação principal estilo SaaS: 'dashboard' | 'kanban' | 'sent' | 'publicidades' | 'metas' | 'importar'
+  const [currentTab, setCurrentTab] = useState('dashboard')
+  const [kanbanMode, setKanbanMode] = useState('board') // 'board' | 'table'
+  const [sentInitialStatus, setSentInitialStatus] = useState('')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const [influencers, setInfluencers] = useState([])
   const [total, setTotal] = useState(0)
@@ -43,7 +93,17 @@ export default function App() {
     closed: 0,
     ghost: 0,
     conversionRate: 0,
+    toContactCount: 0,
+    sentWaitingCount: 0,
+    sentTotalCount: 0,
+    repliedCount: 0,
+    responseRate: 0,
+    missingDataCount: 0,
+    channelCounts: {},
+    statusCounts: {},
+    publicidadesSummary: {},
   })
+
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -53,22 +113,21 @@ export default function App() {
     onlyMined: false,
     sortBy: 'recent',
   })
+
   const [dbStatus, setDbStatus] = useState(null)
   const [apifyQuota, setApifyQuota] = useState(null)
   const [quotaLoading, setQuotaLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Drawer do Influenciador
+  // Drawer & Modais
   const [selectedInfluencer, setSelectedInfluencer] = useState(null)
-
-  // Modais
   const [mineModalOpen, setMineModalOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createPubliModalOpen, setCreatePubliModalOpen] = useState(false)
   const [publiInitialData, setPubliInitialData] = useState({})
 
-  // Gerenciamento de Tema (Dark / Light)
+  // Gerenciamento de Tema (Claro padrão estilo ZapData + Escuro opcional)
   useEffect(() => {
     const root = document.documentElement
     if (theme === 'dark') {
@@ -76,14 +135,13 @@ export default function App() {
     } else {
       root.classList.remove('dark')
     }
-    localStorage.setItem('scout_theme', theme)
+    localStorage.setItem('scout_theme_v3', theme)
   }, [theme])
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
   }
 
-  // Carregar dados de estatísticas da Captação
   const fetchStats = useCallback(async () => {
     try {
       const data = await api.getStats()
@@ -93,7 +151,6 @@ export default function App() {
     }
   }, [])
 
-  // Carregar status dos créditos gratuitos da Apify (Termômetro)
   const fetchApifyQuota = useCallback(async (forceRefresh = false) => {
     setQuotaLoading(true)
     try {
@@ -106,28 +163,33 @@ export default function App() {
     }
   }, [])
 
-  // Carregar lista de influenciadores com filtros
-  const fetchInfluencers = useCallback(async (customPage = page, customFilters = filters) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await api.getInfluencers({
-        ...customFilters,
-        page: customPage,
-        limit: 15,
-      })
-      setInfluencers(res.data || [])
-      setTotal(res.total || 0)
-      setPage(res.page || 1)
-      setTotalPages(res.totalPages || 1)
-    } catch (err) {
-      setError(err.message || 'Falha ao conectar ao servidor do CRM.')
-    } finally {
-      setLoading(false)
-    }
-  }, [page, filters])
+  const fetchInfluencers = useCallback(
+    async (customPage = page, customFilters = filters, modeOverride = kanbanMode) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const isBoard = modeOverride === 'board'
+        const res = await api.getInfluencers({
+          ...customFilters,
+          // No Kanban todas as 4 colunas devem carregar juntas; filtro de status individual fica no modo Lista
+          status: isBoard ? '' : customFilters.status,
+          page: isBoard ? 1 : customPage,
+          limit: isBoard ? 200 : 15,
+        })
+        setInfluencers(res.data || [])
+        setTotal(res.total || 0)
+        setPage(res.page || 1)
+        setTotalPages(res.totalPages || 1)
+      } catch (err) {
+        setError(err.message || 'Falha ao conectar ao servidor do CRM.')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [page, filters, kanbanMode]
+  )
 
-  // Efeito inicial: hidrata cache de minerados caso Vercel/Memória reinicie e verifica Supabase
+  // Inicialização: hidrata leads minerados salvos localmente e carrega saúde/cota/dados
   useEffect(() => {
     const boot = async () => {
       try {
@@ -148,44 +210,69 @@ export default function App() {
 
       fetchApifyQuota(false)
       fetchStats()
-      fetchInfluencers(1, filters)
+      fetchInfluencers(1, filters, 'board')
     }
     boot()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Atualização de filtro
+  const handleNavigateTab = (tabId, preset = {}) => {
+    setCurrentTab(tabId)
+    if (tabId === 'sent') {
+      setSentInitialStatus(preset.status || '')
+    }
+    if (tabId === 'kanban') {
+      const nextFilters = {
+        ...filters,
+        onlyMined: preset.onlyMined !== undefined ? preset.onlyMined : filters.onlyMined,
+        status: preset.status !== undefined ? preset.status : filters.status,
+      }
+      setFilters(nextFilters)
+      fetchInfluencers(1, nextFilters, kanbanMode)
+    }
+  }
+
   const handleFilterChange = (key, value) => {
     const updated = { ...filters, [key]: value }
     setFilters(updated)
     setPage(1)
-    fetchInfluencers(1, updated)
+    fetchInfluencers(1, updated, kanbanMode)
   }
 
-  // Mudança de página
+  const handleToggleKanbanMode = (nextMode) => {
+    setKanbanMode(nextMode)
+    setPage(1)
+    fetchInfluencers(1, filters, nextMode)
+  }
+
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setPage(newPage)
-      fetchInfluencers(newPage, filters)
+      fetchInfluencers(newPage, filters, kanbanMode)
     }
   }
 
-  // Mudança inline de status na tabela de captação
   const handleStatusChange = async (id, newStatus) => {
     setInfluencers((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, status: newStatus } : i))
+      prev.map((i) => (String(i.id) === String(id) ? { ...i, status: newStatus } : i))
     )
 
-    if (selectedInfluencer && selectedInfluencer.id === id) {
+    if (selectedInfluencer && String(selectedInfluencer.id) === String(id)) {
       setSelectedInfluencer((prev) => ({ ...prev, status: newStatus }))
     }
 
     try {
-      await api.updateInfluencer(id, { status: newStatus })
+      const res = await api.updateInfluencer(id, { status: newStatus })
+      if (res?.data) {
+        setInfluencers((prev) =>
+          prev.map((i) => (String(i.id) === String(id) ? { ...i, ...res.data } : i))
+        )
+        updateCachedLead(res.data)
+      }
       fetchStats()
 
-      // Se mudou para Fechou, oferece na hora criar a publicidade preenchida
       if (newStatus === 'Fechou') {
-        const inf = influencers.find((i) => i.id === id)
+        const inf = influencers.find((i) => String(i.id) === String(id))
         if (inf) {
           setPubliInitialData({
             influencer_username: inf.username,
@@ -198,11 +285,46 @@ export default function App() {
       }
     } catch (err) {
       console.error('Erro ao atualizar status:', err.message)
-      fetchInfluencers(page, filters)
+      fetchInfluencers(page, filters, kanbanMode)
     }
   }
 
-  // Atualização a partir do Drawer
+  const handleMarkSent = async (inf, channel) => {
+    const nextStatus = !inf.status || inf.status === 'Novo' ? 'Mensagem Enviada' : inf.status
+    const nowIso = new Date().toISOString()
+
+    setInfluencers((prev) =>
+      prev.map((i) =>
+        String(i.id) === String(inf.id)
+          ? {
+              ...i,
+              status: nextStatus,
+              outreach_channel: channel,
+              contacted_at: i.contacted_at || nowIso,
+              last_contact_at: nowIso,
+            }
+          : i
+      )
+    )
+
+    try {
+      const res = await api.updateInfluencer(inf.id, {
+        status: nextStatus,
+        outreach_channel: channel,
+      })
+      if (res?.data) {
+        setInfluencers((prev) =>
+          prev.map((i) => (String(i.id) === String(inf.id) ? { ...i, ...res.data } : i))
+        )
+        updateCachedLead(res.data)
+      }
+      fetchStats()
+    } catch (err) {
+      console.error('Erro ao marcar mensagem enviada:', err.message)
+      fetchInfluencers(page, filters, kanbanMode)
+    }
+  }
+
   const handleDrawerUpdate = async (id, data) => {
     try {
       const res = await api.updateInfluencer(id, data)
@@ -210,23 +332,22 @@ export default function App() {
 
       setSelectedInfluencer(updated)
       setInfluencers((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, ...updated } : i))
+        prev.map((i) => (String(i.id) === String(id) ? { ...i, ...updated } : i))
       )
+      updateCachedLead(updated)
       fetchStats()
     } catch (err) {
       console.error('Erro ao atualizar influenciador:', err.message)
     }
   }
 
-  // Cadastro Manual de Criador
   const handleCreateLead = async (leadData) => {
     const res = await api.createInfluencer(leadData)
     await fetchStats()
-    await fetchInfluencers(1, filters)
+    await fetchInfluencers(1, filters, kanbanMode)
     return res
   }
 
-  // Disparar criação de publicidade vinda do Drawer ou tabela
   const handleOpenCreatePubliForInfluencer = (inf) => {
     setPubliInitialData({
       influencer_username: inf.username,
@@ -237,7 +358,6 @@ export default function App() {
     setCreatePubliModalOpen(true)
   }
 
-  // Abrir perfil do influenciador a partir de qualquer view (por username)
   const handleSelectInfluencerByUsername = async (username) => {
     const found = influencers.find((i) => i.username?.toLowerCase() === username.toLowerCase())
     if (found) {
@@ -248,309 +368,292 @@ export default function App() {
         if (profile?.influencer) {
           setSelectedInfluencer(profile.influencer)
         }
-      } catch (_e) {
-        // ignora
+      } catch {
+        // Ignora erro caso não encontre
       }
     }
   }
 
+  const activeHeader = TAB_HEADERS[currentTab] || TAB_HEADERS.dashboard
+
   return (
     <div
-      className="min-h-screen font-inter transition-colors duration-200"
+      className="min-h-screen font-inter transition-colors duration-200 flex"
       style={{
         backgroundColor: 'var(--bg-app)',
         color: 'var(--text-primary)',
       }}
     >
-      {/* Top Navigation Bar */}
-      <header
-        className="sticky top-0 z-40 backdrop-blur-md border-b px-6 py-3 flex items-center justify-between transition-colors"
-        style={{
-          backgroundColor: 'var(--header-bg)',
-          borderColor: 'var(--border-color)',
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 text-white">
-            <Sparkles size={18} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                Scout CRM
-              </h1>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                v2.0 ERP
-              </span>
-            </div>
-            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              Operação de Afiliados .bet.br — Captação, Publicidades & Metas
-            </p>
-          </div>
-        </div>
+      {/* Sidebar Lateral Estilo SaaS */}
+      <Sidebar
+        currentTab={currentTab}
+        onSelectTab={(tab) => handleNavigateTab(tab)}
+        stats={stats}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
+      />
 
-        {/* Central Segmented Tab Switcher */}
-        <div
-          className="hidden md:flex p-1 rounded-2xl border text-xs font-semibold"
+      {/* Área Principal */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Top Bar do Conteúdo */}
+        <header
+          className="sticky top-0 z-30 backdrop-blur-md border-b px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 transition-colors"
           style={{
-            backgroundColor: 'var(--bg-card-secondary)',
+            backgroundColor: 'var(--header-bg)',
             borderColor: 'var(--border-color)',
           }}
         >
-          <button
-            onClick={() => setCurrentTab('captacao')}
-            className={`px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-              currentTab === 'captacao'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'hover:text-blue-500 text-zinc-400'
-            }`}
-          >
-            <Users size={13} />
-            <span>Captação SDR</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                currentTab === 'captacao' ? 'bg-white/20 text-white' : 'bg-zinc-500/10 text-zinc-400'
-              }`}
-            >
-              {total}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('publicidades')}
-            className={`px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-              currentTab === 'publicidades'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'hover:text-blue-500 text-zinc-400'
-            }`}
-          >
-            <DollarSign size={13} />
-            <span>Publicidades</span>
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('metas')}
-            className={`px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-              currentTab === 'metas'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'hover:text-blue-500 text-zinc-400'
-            }`}
-          >
-            <Target size={13} />
-            <span>Metas de Depositantes</span>
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('importar')}
-            className={`px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-              currentTab === 'importar'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'hover:text-blue-500 text-zinc-400'
-            }`}
-          >
-            <FileSpreadsheet size={13} />
-            <span>Planilhas</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <ApifyThermometer
-            quota={apifyQuota}
-            loading={quotaLoading}
-            onClick={() => {
-              fetchApifyQuota(true)
-              setMineModalOpen(true)
-            }}
-            variant="compact"
-          />
-
-          {dbStatus && (
-            <span
-              title={
-                dbStatus.online
-                  ? `Supabase conectado e ativo (${dbStatus.count ?? 0} registros${dbStatus.latencyMs ? ` • ${dbStatus.latencyMs}ms` : ''})`
-                  : 'Supabase em pausa/offline — leads minerados protegidos no cache local e memória'
-              }
-              className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border ${
-                dbStatus.online
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-500'
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.online ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              <span>{dbStatus.online ? 'DB Online' : 'Modo Local/Cache'}</span>
-            </span>
-          )}
-
-          {/* Theme Toggle (Dark / Light) */}
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-xl border transition-all hover:scale-105"
-            style={{
-              backgroundColor: 'var(--bg-surface)',
-              borderColor: 'var(--border-color)',
-              color: 'var(--text-muted)',
-            }}
-            title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
-          >
-            {theme === 'dark' ? (
-              <Sun size={16} className="text-amber-400" />
-            ) : (
-              <Moon size={16} className="text-zinc-600" />
-            )}
-          </button>
-
-          {/* Botões contextuais */}
-          {currentTab === 'captacao' && (
-            <>
-              <button
-                onClick={() => setCreateModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
-              >
-                <UserPlus size={14} />
-                <span>+ Novo Lead</span>
-              </button>
-
-              <button
-                onClick={() => setMineModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
-              >
-                <Sparkles size={14} />
-                <span>Minerar</span>
-              </button>
-            </>
-          )}
-
-          {currentTab === 'publicidades' && (
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => {
-                setPubliInitialData({})
-                setCreatePubliModalOpen(true)
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded-xl border"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)',
               }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+              aria-label="Abrir menu"
             >
-              <DollarSign size={14} />
-              <span>+ Nova Publicidade</span>
+              <Menu size={18} />
             </button>
-          )}
-        </div>
-      </header>
 
-      {/* Mobile Tab Switcher */}
-      <div
-        className="md:hidden flex border-b px-4 py-2 gap-1 overflow-x-auto text-xs font-semibold"
-        style={{
-          backgroundColor: 'var(--bg-card-secondary)',
-          borderColor: 'var(--border-color)',
-        }}
-      >
-        <button
-          onClick={() => setCurrentTab('captacao')}
-          className={`px-3 py-1 rounded-lg whitespace-nowrap ${
-            currentTab === 'captacao' ? 'bg-blue-600 text-white' : 'text-zinc-400'
-          }`}
-        >
-          🎯 Captação ({total})
-        </button>
-        <button
-          onClick={() => setCurrentTab('publicidades')}
-          className={`px-3 py-1 rounded-lg whitespace-nowrap ${
-            currentTab === 'publicidades' ? 'bg-blue-600 text-white' : 'text-zinc-400'
-          }`}
-        >
-          💰 Publicidades
-        </button>
-        <button
-          onClick={() => setCurrentTab('metas')}
-          className={`px-3 py-1 rounded-lg whitespace-nowrap ${
-            currentTab === 'metas' ? 'bg-blue-600 text-white' : 'text-zinc-400'
-          }`}
-        >
-          🏁 Metas
-        </button>
-        <button
-          onClick={() => setCurrentTab('importar')}
-          className={`px-3 py-1 rounded-lg whitespace-nowrap ${
-            currentTab === 'importar' ? 'bg-blue-600 text-white' : 'text-zinc-400'
-          }`}
-        >
-          📥 Planilhas
-        </button>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                {activeHeader.title}
+              </h1>
+              <p className="text-[11px] hidden sm:block" style={{ color: 'var(--text-muted)' }}>
+                {activeHeader.subtitle}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <ApifyThermometer
+              quota={apifyQuota}
+              loading={quotaLoading}
+              onClick={() => {
+                fetchApifyQuota(true)
+                setMineModalOpen(true)
+              }}
+              variant="compact"
+            />
+
+            {dbStatus && (
+              <span
+                title={
+                  dbStatus.online
+                    ? `Supabase conectado e ativo (${dbStatus.count ?? 0} registros${dbStatus.latencyMs ? ` • ${dbStatus.latencyMs}ms` : ''})`
+                    : 'Supabase em pausa/offline — leads minerados protegidos no cache local e memória'
+                }
+                className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                  dbStatus.online
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.online ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                <span>{dbStatus.online ? 'DB Online' : 'Modo Local'}</span>
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="p-2 rounded-xl border transition-all hover:scale-105"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-muted)',
+              }}
+              title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
+            >
+              {theme === 'dark' ? (
+                <Sun size={16} className="text-amber-400" />
+              ) : (
+                <Moon size={16} className="text-zinc-600" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCreateModalOpen(true)}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-sm active:scale-95 transition-all"
+            >
+              <UserPlus size={14} />
+              <span>+ Novo Lead</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMineModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-sm active:scale-95 transition-all"
+            >
+              <Sparkles size={14} />
+              <span>Minerar</span>
+            </button>
+
+            {currentTab === 'publicidades' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPubliInitialData({})
+                  setCreatePubliModalOpen(true)
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-xs rounded-xl shadow-sm active:scale-95 transition-all"
+              >
+                <DollarSign size={14} />
+                <span>+ Nova Publi</span>
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-6 space-y-5">
+          {error && (
+            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs">
+              <AlertCircle size={18} className="shrink-0" />
+              <div className="flex-1">
+                <strong>Erro:</strong> {error}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  fetchStats()
+                  fetchInfluencers(1, filters, kanbanMode)
+                }}
+                className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded-lg font-medium transition-colors"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          )}
+
+          {/* VIEW 1: DASHBOARD ESTILO ZAPDATA */}
+          {currentTab === 'dashboard' && (
+            <DashboardView
+              stats={stats}
+              onNavigateTab={handleNavigateTab}
+              onMineClick={() => setMineModalOpen(true)}
+              onlyMinedFilter={filters.onlyMined}
+              onToggleOnlyMined={(val) => handleFilterChange('onlyMined', val)}
+            />
+          )}
+
+          {/* VIEW 2: CRM KANBAN (COM ALTERNADOR KANBAN / LISTA) */}
+          {currentTab === 'kanban' && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div
+                  className="inline-flex p-1 rounded-xl border text-xs font-semibold"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-color)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleToggleKanbanMode('board')}
+                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                      kanbanMode === 'board' ? 'bg-blue-600 text-white shadow-sm' : ''
+                    }`}
+                    style={{ color: kanbanMode === 'board' ? undefined : 'var(--text-muted)' }}
+                  >
+                    <Columns3 size={13} />
+                    <span>Visual Kanban</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleKanbanMode('table')}
+                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                      kanbanMode === 'table' ? 'bg-blue-600 text-white shadow-sm' : ''
+                    }`}
+                    style={{ color: kanbanMode === 'table' ? undefined : 'var(--text-muted)' }}
+                  >
+                    <List size={13} />
+                    <span>Lista / Tabela ({total})</span>
+                  </button>
+                </div>
+
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Exibindo <strong>{influencers.length}</strong> de <strong>{total}</strong> leads
+                </span>
+              </div>
+
+              <FilterBar
+                filters={filters}
+                onFilterChange={handleFilterChange}
+                showStatusFilter={kanbanMode === 'table'}
+                onRefresh={() => {
+                  fetchStats()
+                  fetchInfluencers(page, filters, kanbanMode)
+                }}
+                loading={loading}
+              />
+
+              {kanbanMode === 'board' ? (
+                <KanbanBoard
+                  influencers={influencers}
+                  loading={loading}
+                  onSelectInfluencer={setSelectedInfluencer}
+                  onMarkSent={handleMarkSent}
+                  onStatusChange={handleStatusChange}
+                  onCreatePublicidadeForInfluencer={handleOpenCreatePubliForInfluencer}
+                  onMineClick={() => setMineModalOpen(true)}
+                  onOpenSentView={() => handleNavigateTab('sent')}
+                />
+              ) : (
+                <InfluencerTable
+                  influencers={influencers}
+                  total={total}
+                  page={page}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  onSelectInfluencer={setSelectedInfluencer}
+                  onStatusChange={handleStatusChange}
+                  loading={loading}
+                  onMineClick={() => setMineModalOpen(true)}
+                  onAddLeadClick={() => setCreateModalOpen(true)}
+                />
+              )}
+            </div>
+          )}
+
+          {/* VIEW 3: PAINEL EXCLUSIVO JÁ MANDADOS */}
+          {currentTab === 'sent' && (
+            <SentLeadsView
+              stats={stats}
+              initialStatusFilter={sentInitialStatus}
+              onSelectInfluencer={setSelectedInfluencer}
+              onStatusChange={handleStatusChange}
+              onRefreshParentStats={fetchStats}
+            />
+          )}
+
+          {/* VIEW 4: PUBLICIDADES */}
+          {currentTab === 'publicidades' && (
+            <PublicidadesView onSelectInfluencer={handleSelectInfluencerByUsername} />
+          )}
+
+          {/* VIEW 5: METAS */}
+          {currentTab === 'metas' && (
+            <MetasView onSelectInfluencer={handleSelectInfluencerByUsername} />
+          )}
+
+          {/* VIEW 6: PLANILHAS */}
+          {currentTab === 'importar' && (
+            <ImportView
+              onDataChanged={() => {
+                fetchStats()
+                fetchInfluencers(1, filters, kanbanMode)
+              }}
+            />
+          )}
+        </main>
       </div>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Error Alert */}
-        {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs">
-            <AlertCircle size={18} className="shrink-0" />
-            <div className="flex-1">
-              <strong>Erro:</strong> {error}
-            </div>
-            <button
-              onClick={() => {
-                fetchStats()
-                fetchInfluencers(1, filters)
-              }}
-              className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded-lg font-medium transition-colors"
-            >
-              Tentar Novamente
-            </button>
-          </div>
-        )}
-
-        {/* VIEW 1: CAPTAÇÃO SDR */}
-        {currentTab === 'captacao' && (
-          <>
-            <KPICards stats={stats} />
-            <FilterBar
-              filters={filters}
-              onFilterChange={handleFilterChange}
-              onMineClick={() => setMineModalOpen(true)}
-              onAddLeadClick={() => setCreateModalOpen(true)}
-              onRefresh={() => {
-                fetchStats()
-                fetchInfluencers(page, filters)
-              }}
-              loading={loading}
-            />
-            <InfluencerTable
-              influencers={influencers}
-              total={total}
-              page={page}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              onSelectInfluencer={(inf) => setSelectedInfluencer(inf)}
-              onStatusChange={handleStatusChange}
-              loading={loading}
-              onMineClick={() => setMineModalOpen(true)}
-              onAddLeadClick={() => setCreateModalOpen(true)}
-            />
-          </>
-        )}
-
-        {/* VIEW 2: PUBLICIDADES FINANCEIRAS */}
-        {currentTab === 'publicidades' && (
-          <PublicidadesView onSelectInfluencer={handleSelectInfluencerByUsername} />
-        )}
-
-        {/* VIEW 3: METAS DE DEPOSITANTES */}
-        {currentTab === 'metas' && (
-          <MetasView onSelectInfluencer={handleSelectInfluencerByUsername} />
-        )}
-
-        {/* VIEW 4: IMPORTAÇÃO & EXPORTAÇÃO */}
-        {currentTab === 'importar' && (
-          <ImportView
-            onDataChanged={() => {
-              fetchStats()
-              fetchInfluencers(1, filters)
-            }}
-          />
-        )}
-      </main>
-
-      {/* Drawer Lateral Unificado com Histórico e Ações */}
+      {/* Drawer Lateral Unificado & Editável */}
       <InfluencerDrawer
         influencer={selectedInfluencer}
         onClose={() => setSelectedInfluencer(null)}
@@ -587,12 +690,15 @@ export default function App() {
             search: '',
             status: '',
             classification: '',
+            onlyMined: false,
             sortBy: 'recent',
           }
           setFilters(updatedFilters)
           setPage(1)
+          setCurrentTab('kanban')
+          setKanbanMode('board')
           fetchStats()
-          fetchInfluencers(1, updatedFilters)
+          fetchInfluencers(1, updatedFilters, 'board')
           fetchApifyQuota(true)
         }}
       />

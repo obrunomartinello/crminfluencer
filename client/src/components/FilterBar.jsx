@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, Sparkles, RotateCw, ChevronDown, UserPlus, ShieldCheck, ArrowUpDown } from 'lucide-react'
+import { Search, Sparkles, RotateCw, ChevronDown, ShieldCheck, ArrowUpDown } from 'lucide-react'
 import { PEDRO_STATUSES } from '../constants/nichePresets'
 
 export default function FilterBar({
   filters,
   onFilterChange,
-  onMineClick,
-  onAddLeadClick,
   onRefresh,
   loading,
+  showStatusFilter = true,
 }) {
   const [searchValue, setSearchValue] = useState(filters.search || '')
   const debounceRef = useRef(null)
@@ -127,30 +126,32 @@ export default function FilterBar({
           </div>
         </div>
 
-        {/* Status Dropdown alinhado com os 7 status reais do Pedro */}
-        <div className="relative">
-          <select
-            value={filters.status || ''}
-            onChange={(e) => onFilterChange('status', e.target.value)}
-            className="appearance-none border text-xs font-medium pl-3 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer transition-colors"
-            style={{
-              backgroundColor: 'var(--input-bg)',
-              borderColor: filters.status ? '#3B82F6' : 'var(--border-color)',
-              color: 'var(--text-primary)',
-            }}
-          >
-            <option value="">Status: Todos</option>
-            {PEDRO_STATUSES.map((st) => (
-              <option key={st} value={st}>
-                {st}
-              </option>
-            ))}
-            <option value="Remarketing">♻️ Remarketing (Grupo)</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
-            <ChevronDown size={14} />
+        {/* Status Dropdown alinhado com os status do Pedro (visível no modo Lista) */}
+        {showStatusFilter && (
+          <div className="relative">
+            <select
+              value={filters.status || ''}
+              onChange={(e) => onFilterChange('status', e.target.value)}
+              className="appearance-none border text-xs font-medium pl-3 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer transition-colors"
+              style={{
+                backgroundColor: 'var(--input-bg)',
+                borderColor: filters.status ? '#3B82F6' : 'var(--border-color)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <option value="">Status: Todos</option>
+              {PEDRO_STATUSES.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))}
+              <option value="Remarketing">♻️ Remarketing (Grupo)</option>
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
+              <ChevronDown size={14} />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Classification Dropdown */}
         <div className="relative">
@@ -207,24 +208,6 @@ export default function FilterBar({
           }}
         >
           <RotateCw size={15} className={loading ? 'animate-spin' : ''} />
-        </button>
-
-        {/* Minerar Button */}
-        <button
-          onClick={onMineClick}
-          className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-xs px-3.5 py-2 rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
-        >
-          <Sparkles size={14} />
-          <span>Minerar Instagram</span>
-        </button>
-
-        {/* Adicionar Criador Manual */}
-        <button
-          onClick={onAddLeadClick}
-          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-3.5 py-2 rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
-        >
-          <UserPlus size={14} />
-          <span>+ Novo Lead</span>
         </button>
       </div>
     </div>
