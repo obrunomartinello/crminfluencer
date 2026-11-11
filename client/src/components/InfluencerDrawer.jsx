@@ -6,46 +6,56 @@ import {
   Copy,
   Check,
   Sparkles,
-  ShieldAlert,
-  Building2,
-  Ticket,
-  ShoppingBag,
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   Target,
   FileText,
-  UserCheck,
   Plus,
   AlertTriangle,
+  Save,
+  CheckCircle2,
+  MessageCircle,
+  AtSign,
 } from 'lucide-react'
 import { api } from '../lib/api'
+import { PEDRO_STATUSES } from '../constants/nichePresets'
+
+const GAMES = ['Block Win', 'Bubble Win', 'Cust Win', 'Count Masters']
 
 export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCreatePublicidadeForInfluencer }) {
+  const [status, setStatus] = useState('Novo')
+  const [outreachChannel, setOutreachChannel] = useState('')
+  const [customPhone, setCustomPhone] = useState('')
+  const [campaignGame, setCampaignGame] = useState('')
+  const [storyViewsAvg, setStoryViewsAvg] = useState('')
+  const [storyClicksAvg, setStoryClicksAvg] = useState('')
+  const [storyAskingPrice, setStoryAskingPrice] = useState('')
   const [notes, setNotes] = useState('')
   const [copied, setCopied] = useState(false)
-  const [customPhone, setCustomPhone] = useState('')
   const [drawerTab, setDrawerTab] = useState('resumo') // 'resumo' | 'publicidades' | 'metas' | 'scripts'
   const [scriptTab, setScriptTab] = useState('urgencia')
-  const [savingNotes, setSavingNotes] = useState(false)
+  const [savingForm, setSavingForm] = useState(false)
+  const [savedFeedback, setSavedFeedback] = useState(false)
   const [isGhost, setIsGhost] = useState(false)
 
   // Dados unificados carregados da API
   const [fullProfile, setFullProfile] = useState(null)
-  const [loadingProfile, setLoadingProfile] = useState(false)
 
   useEffect(() => {
     if (influencer) {
-      setNotes(influencer.user_notes || '')
+      setStatus(influencer.status || 'Novo')
+      setOutreachChannel(influencer.outreach_channel || '')
       setCustomPhone(influencer.whatsapp || '')
+      setCampaignGame(influencer.campaign_game || '')
+      setStoryViewsAvg(influencer.story_views_avg ? String(influencer.story_views_avg) : '')
+      setStoryClicksAvg(influencer.story_clicks_avg ? String(influencer.story_clicks_avg) : '')
+      setStoryAskingPrice(influencer.story_asking_price ? String(influencer.story_asking_price) : '')
+      setNotes(influencer.user_notes || '')
       setIsGhost(!!influencer.is_ghost || influencer.user_notes?.toLowerCase().includes('ghost'))
+      setSavedFeedback(false)
 
-      // Carregar perfil unificado completo
-      setLoadingProfile(true)
       api.getInfluencerFullProfile(influencer.username)
         .then((res) => setFullProfile(res))
         .catch(() => setFullProfile(null))
-        .finally(() => setLoadingProfile(false))
     }
   }, [influencer])
 
@@ -56,7 +66,7 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
   const formatNum = (num) => new Intl.NumberFormat('pt-BR').format(num || 0)
 
   const name = influencer.full_name ? influencer.full_name.split(' ')[0] : `@${influencer.username}`
-  const cleanPhone = (customPhone || influencer.whatsapp || '').replace(/\D/g, '')
+  const cleanPhone = (customPhone || '').replace(/\D/g, '')
   const formattedPhone = cleanPhone.length === 11
     ? `(${cleanPhone.slice(0, 2)}) ${cleanPhone.slice(2, 7)}-${cleanPhone.slice(7)}`
     : cleanPhone.length === 10
@@ -81,12 +91,44 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleSaveNotes = async () => {
-    setSavingNotes(true)
+  const handleSaveAll = async (e) => {
+    if (e) e.preventDefault()
+    setSavingForm(true)
+    setSavedFeedback(false)
     try {
-      await onUpdate(influencer.id, { user_notes: notes, is_ghost: isGhost })
+      await onUpdate(influencer.id, {
+        status,
+        outreach_channel: outreachChannel || null,
+        whatsapp: cleanPhone || null,
+        campaign_game: campaignGame || null,
+        story_views_avg: storyViewsAvg === '' ? 0 : parseInt(storyViewsAvg, 10) || 0,
+        story_clicks_avg: storyClicksAvg === '' ? 0 : parseInt(storyClicksAvg, 10) || 0,
+        story_asking_price: storyAskingPrice === '' ? 0 : parseFloat(storyAskingPrice) || 0,
+        user_notes: notes,
+        is_ghost: isGhost,
+      })
+      setSavedFeedback(true)
+      setTimeout(() => setSavedFeedback(false), 2500)
     } finally {
-      setSavingNotes(false)
+      setSavingForm(false)
+    }
+  }
+
+  const handleQuickMarkSent = async (channel) => {
+    const nextStatus = status === 'Novo' ? 'Mensagem Enviada' : status
+    setStatus(nextStatus)
+    setOutreachChannel(channel)
+    setSavingForm(true)
+    try {
+      await onUpdate(influencer.id, {
+        status: nextStatus,
+        outreach_channel: channel,
+        whatsapp: cleanPhone || null,
+      })
+      setSavedFeedback(true)
+      setTimeout(() => setSavedFeedback(false), 2500)
+    } finally {
+      setSavingForm(false)
     }
   }
 
@@ -103,9 +145,12 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
   const publicidadesList = fullProfile?.publicidades || []
   const metasList = fullProfile?.metas || []
   const metrics = fullProfile?.metrics || {}
+  const contactedDateLabel = influencer.contacted_at
+    ? new Date(influencer.contacted_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    : null
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm flex justify-end animate-fadeIn">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-sm flex justify-end animate-fadeIn" onClick={onClose}>
       <div
         className="relative w-full max-w-xl h-full shadow-2xl flex flex-col transform transition-transform duration-300 border-l"
         style={{
@@ -166,14 +211,19 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
                 <ExternalLink size={11} />
               </a>
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                {influencer.campaign_game && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                    {influencer.campaign_game}
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  {status}
+                </span>
+                {campaignGame && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                    {campaignGame}
                   </span>
                 )}
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-400">
-                  Status: {influencer.status || 'Novo'}
-                </span>
+                {contactedDateLabel && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    Mandado em {contactedDateLabel}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -186,70 +236,70 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
           </button>
         </div>
 
-        {/* Barra de Contato Rápido & WhatsApp */}
+        {/* Barra de Contato Rápido & Ações Imediatas */}
         <div
-          className="px-5 py-2.5 border-b flex items-center justify-between text-xs shrink-0"
+          className="px-5 py-2.5 border-b flex flex-wrap items-center justify-between gap-2 text-xs shrink-0"
           style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
         >
           <div className="flex items-center gap-2">
             <Phone size={14} className="text-emerald-500 shrink-0" />
             <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
-              {formattedPhone ? formattedPhone : 'Sem WhatsApp informado'}
+              {formattedPhone || 'Sem WhatsApp cadastrado'}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {cleanPhone ? (
+            {cleanPhone && (
               <a
                 href={`https://wa.me/${intlPhone}?text=${encodeURIComponent(currentMessage)}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-xl shadow-sm transition-all"
               >
-                <Phone size={12} />
+                <MessageCircle size={12} />
                 <span>Abrir WhatsApp</span>
               </a>
-            ) : null}
+            )}
 
-            {/* Toggle Ghost */}
             <button
+              type="button"
               onClick={handleToggleGhost}
               className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all ${
                 isGhost
                   ? 'bg-red-500/15 border-red-500/40 text-red-500'
-                  : 'hover:bg-zinc-500/10 text-zinc-400'
+                  : 'hover:bg-zinc-500/10 text-zinc-500'
               }`}
               style={{ borderColor: isGhost ? undefined : 'var(--border-color)' }}
               title="Marcar como Ghost caso tenha sumido após contato ou pagamento"
             >
-              {isGhost ? 'Flag: Ghost Ativo' : 'Marcar Ghost'}
+              {isGhost ? 'Ghost Ativo' : 'Marcar Ghost'}
             </button>
           </div>
         </div>
 
         {/* Segmented Tabs do Drawer */}
         <div
-          className="flex border-b px-5 pt-2 gap-2 text-xs font-semibold shrink-0"
+          className="flex border-b px-5 pt-2 gap-3 text-xs font-semibold shrink-0 overflow-x-auto"
           style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-card-secondary)' }}
         >
           <button
             onClick={() => setDrawerTab('resumo')}
-            className={`pb-2 border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`pb-2 border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               drawerTab === 'resumo'
-                ? 'border-blue-500 text-blue-500'
-                : 'border-transparent text-zinc-400 hover:text-zinc-300'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
             }`}
           >
             <FileText size={13} />
-            <span>Resumo & Notas</span>
+            <span>Ficha & Preenchimento</span>
           </button>
 
           <button
             onClick={() => setDrawerTab('publicidades')}
-            className={`pb-2 border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`pb-2 border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               drawerTab === 'publicidades'
-                ? 'border-blue-500 text-blue-500'
-                : 'border-transparent text-zinc-400 hover:text-zinc-300'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
             }`}
           >
             <DollarSign size={13} />
@@ -258,10 +308,10 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
 
           <button
             onClick={() => setDrawerTab('metas')}
-            className={`pb-2 border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`pb-2 border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               drawerTab === 'metas'
-                ? 'border-blue-500 text-blue-500'
-                : 'border-transparent text-zinc-400 hover:text-zinc-300'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
             }`}
           >
             <Target size={13} />
@@ -270,28 +320,272 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
 
           <button
             onClick={() => setDrawerTab('scripts')}
-            className={`pb-2 border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`pb-2 border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               drawerTab === 'scripts'
-                ? 'border-blue-500 text-blue-500'
-                : 'border-transparent text-zinc-400 hover:text-zinc-300'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
             }`}
           >
             <Sparkles size={13} />
-            <span>Scripts do Pedro</span>
+            <span>Scripts ({scriptTab})</span>
           </button>
         </div>
 
         {/* Drawer Body Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
-          {/* TAB 1: RESUMO & NOTAS */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+          {/* TAB 1: FICHA & PREENCHIMENTO SDR */}
           {drawerTab === 'resumo' && (
-            <div className="space-y-4">
+            <form onSubmit={handleSaveAll} className="space-y-4">
+              {/* Bloco 1: Marcar Abordagem / Canal */}
+              <div
+                className="p-4 rounded-xl border space-y-3"
+                style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    1. Registro de Envio (Separar dos Novos)
+                  </span>
+                  {status === 'Novo' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      Falta Abordar
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                      Já Mandado
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={savingForm}
+                    onClick={() => handleQuickMarkSent('whatsapp')}
+                    className={`flex-1 min-w-[150px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                      outreachChannel === 'whatsapp' && status !== 'Novo'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'hover:bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                    }`}
+                  >
+                    <MessageCircle size={14} />
+                    <span>{status === 'Novo' ? 'Mandei no WhatsApp' : 'Canal: WhatsApp'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={savingForm}
+                    onClick={() => handleQuickMarkSent('instagram')}
+                    className={`flex-1 min-w-[150px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                      outreachChannel === 'instagram' && status !== 'Novo'
+                        ? 'bg-pink-600 text-white border-pink-600 shadow-sm'
+                        : 'hover:bg-pink-500/10 border-pink-500/40 text-pink-600 dark:text-pink-400'
+                    }`}
+                  >
+                    <AtSign size={14} />
+                    <span>{status === 'Novo' ? 'Mandei no Direct IG' : 'Canal: Direct IG'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bloco 2: Formulário Editável de Preenchimento SDR */}
+              <div
+                className="p-4 rounded-xl border space-y-3.5"
+                style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    2. O que Preencher deste Influenciador
+                  </span>
+                  {savedFeedback && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 size={13} /> Ficha salva!
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                      Etapa Atual no Funil
+                    </label>
+                    <select
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-medium"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      {PEDRO_STATUSES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                      WhatsApp (c/ DDD)
+                    </label>
+                    <input
+                      type="text"
+                      value={customPhone}
+                      onChange={(e) => setCustomPhone(e.target.value)}
+                      placeholder="Ex: 11999887766"
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-mono"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                      Jogo da Campanha
+                    </label>
+                    <select
+                      value={campaignGame}
+                      onChange={(e) => setCampaignGame(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-medium"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <option value="">-- Definir jogo --</option>
+                      {GAMES.map((g) => (
+                        <option key={g} value={g}>
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                      Valor Pedido p/ Publi (R$)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={storyAskingPrice}
+                      onChange={(e) => setStoryAskingPrice(e.target.value)}
+                      placeholder="Ex: 500"
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-mono"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                      Média Views Stories
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={storyViewsAvg}
+                      onChange={(e) => setStoryViewsAvg(e.target.value)}
+                      placeholder="Ex: 4500"
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-mono"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                      Média Cliques Link Stories
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={storyClicksAvg}
+                      onChange={(e) => setStoryClicksAvg(e.target.value)}
+                      placeholder="Ex: 320"
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-mono"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                    Observações & Histórico da Negociação
+                  </label>
+                  <textarea
+                    rows="3"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Ex: Pediu 500 no pix, fechou por 400 + meta de depositantes..."
+                    className="w-full px-3 py-2 border rounded-xl text-xs"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    {formatNum(influencer.followers_count)} seg • {formatNum(influencer.avg_reels_views)} views Reels
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={savingForm}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-sm transition-all disabled:opacity-60"
+                  >
+                    {savingForm ? (
+                      <span>Salvando...</span>
+                    ) : (
+                      <>
+                        <Save size={13} />
+                        <span>Salvar Ficha</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Bio Resumida do Instagram */}
+              {influencer.bio && (
+                <div
+                  className="p-3.5 rounded-xl border space-y-1"
+                  style={{ backgroundColor: 'var(--bg-card-secondary)', borderColor: 'var(--border-color)' }}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Bio do Instagram
+                  </span>
+                  <p className="text-xs whitespace-pre-line leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                    {influencer.bio}
+                  </p>
+                </div>
+              )}
+
               {/* Card Financeiro Acumulado deste Criador */}
               <div
                 className="p-4 rounded-xl border space-y-2"
                 style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
               >
-                <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                   Histórico Financeiro Acumulado
                 </div>
                 <div className="grid grid-cols-3 gap-2 pt-1">
@@ -325,18 +619,19 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
               </div>
 
               {/* Botão se o status for Fechou */}
-              {influencer.status === 'Fechou' && (
+              {status === 'Fechou' && (
                 <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">
                   <div>
                     <div className="font-bold text-emerald-600 dark:text-emerald-400">
                       Parceria Fechada!
                     </div>
-                    <div className="text-[11px] text-zinc-400">
+                    <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                       Lance agora a publicidade financeira desta campanha.
                     </div>
                   </div>
                   {onCreatePublicidadeForInfluencer && (
                     <button
+                      type="button"
                       onClick={() => onCreatePublicidadeForInfluencer(influencer)}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl shadow-sm transition-all"
                     >
@@ -346,38 +641,7 @@ export default function InfluencerDrawer({ influencer, onClose, onUpdate, onCrea
                   )}
                 </div>
               )}
-
-              {/* Bloco de Observações do Pedro */}
-              <div
-                className="p-4 rounded-xl border space-y-2"
-                style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-              >
-                <div className="flex items-center justify-between">
-                  <label className="font-semibold text-xs" style={{ color: 'var(--text-primary)' }}>
-                    Observações & Histórico da Negociação
-                  </label>
-                  <button
-                    onClick={handleSaveNotes}
-                    disabled={savingNotes}
-                    className="text-blue-500 hover:text-blue-400 font-semibold text-[11px] flex items-center gap-1"
-                  >
-                    {savingNotes ? 'Salvando...' : 'Salvar Nota'}
-                  </button>
-                </div>
-                <textarea
-                  rows="4"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ex: Pediu 500 no pix, fechou por 400 + indicação do fulano..."
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                  style={{
-                    backgroundColor: 'var(--input-bg)',
-                    borderColor: 'var(--border-color)',
-                    color: 'var(--text-primary)',
-                  }}
-                />
-              </div>
-            </div>
+            </form>
           )}
 
           {/* TAB 2: PUBLICIDADES DELE */}
