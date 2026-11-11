@@ -2,6 +2,7 @@
 
 export const PEDRO_STATUSES = [
   'Novo',
+  'Mensagem Enviada',
   'Sem resposta',
   'Em negociação',
   'Fechou',

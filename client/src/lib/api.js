@@ -36,6 +36,8 @@ export const api = {
   async getInfluencers({
     search = '',
     status = '',
+    stage = '',
+    channel = '',
     classification = '',
     minFollowers = '',
     hideAgencies = false,
@@ -47,6 +49,8 @@ export const api = {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (status) params.set('status', status)
+    if (stage) params.set('stage', stage)
+    if (channel) params.set('channel', channel)
     if (classification) params.set('classification', classification)
     if (minFollowers) params.set('minFollowers', minFollowers)
     if (hideAgencies) params.set('hideAgencies', 'true')
