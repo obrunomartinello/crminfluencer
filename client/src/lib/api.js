@@ -194,6 +194,11 @@ export const api = {
     return request(`/mine/status/${jobId}`)
   },
 
+  async getMineQuota(forceRefresh = false) {
+    const suffix = forceRefresh ? '?refresh=1' : ''
+    return request(`/mine/quota${suffix}`)
+  },
+
   async mine(query, count = 25) {
     return request('/mine', {
       method: 'POST',

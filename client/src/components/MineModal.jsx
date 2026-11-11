@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { NICHE_PRESETS } from '../constants/nichePresets'
 import { api } from '../lib/api'
+import ApifyThermometer from './ApifyThermometer'
 
 const SEARCH_MODES = [
   {
@@ -37,7 +38,14 @@ const SEARCH_MODES = [
   },
 ]
 
-export default function MineModal({ open, onClose, onComplete }) {
+export default function MineModal({
+  open,
+  onClose,
+  onComplete,
+  quota,
+  quotaLoading,
+  onRefreshQuota,
+}) {
   const [query, setQuery] = useState('')
   const [count, setCount] = useState(20)
   const [mode, setMode] = useState('hybrid')
@@ -63,6 +71,12 @@ export default function MineModal({ open, onClose, onComplete }) {
   useEffect(() => {
     return () => stopTimers()
   }, [])
+
+  useEffect(() => {
+    if (open && onRefreshQuota) {
+      onRefreshQuota(false)
+    }
+  }, [open, onRefreshQuota])
 
   if (!open) return null
 
@@ -203,6 +217,14 @@ export default function MineModal({ open, onClose, onComplete }) {
         </div>
 
         <div className="overflow-y-auto pr-1 space-y-4 flex-1">
+          {/* Termômetro de Créditos Apify */}
+          <ApifyThermometer
+            quota={quota}
+            loading={quotaLoading}
+            onRefresh={onRefreshQuota}
+            variant="detailed"
+          />
+
           {/* Sub-nichos de Arbitragem do Playbook */}
           <div>
             <div className="flex items-center justify-between mb-2">

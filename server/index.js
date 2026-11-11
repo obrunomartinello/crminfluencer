@@ -21,18 +21,27 @@ app.get('/api/games', (req, res) => {
   res.json({ games: store.listGames() })
 })
 
-// Health check + Keepalive do Supabase
-app.get('/api/health', async (req, res) => {
+// Health check + Keepalive do Supabase (sempre sem cache CDN)
+async function handleKeepalive(req, res) {
   const store = require('./db/store')
   const supabase = await store.checkSupabaseHealth()
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate')
   res.json({
     ok: true,
+    keepalive: true,
     timestamp: new Date().toISOString(),
     supabase,
   })
-})
+}
+
+app.get('/api/health', handleKeepalive)
+app.get('/api/cron/keepalive', handleKeepalive)
 
 const PORT = process.env.PORT || 3001
-app.listen(PORT, () => {
-  console.log(`🚀 Scout CRM Server rodando na porta ${PORT}`)
-})
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Scout CRM Server rodando na porta ${PORT}`)
+  })
+}
+
+module.exports = app

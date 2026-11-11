@@ -53,20 +53,36 @@ const store = {
   },
 
   async checkSupabaseHealth() {
+    const lastPingAt = new Date().toISOString()
     if (!supabase) {
-      return { configured: false, online: false, reason: 'not_configured' }
+      return { configured: false, online: false, reason: 'not_configured', lastPingAt }
     }
+    const startedAt = Date.now()
     try {
+      // Executa leitura real (sem head-only) para registrar atividade na API/Postgres do Supabase e evitar hibernação
       const result = await Promise.race([
-        supabase.from('influencers').select('id', { count: 'exact', head: true }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase timeout/paused')), 2500)),
+        supabase.from('influencers').select('id', { count: 'exact' }).limit(1),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase timeout/paused')), 4000)),
       ])
+      const latencyMs = Date.now() - startedAt
       if (result.error) {
-        return { configured: true, online: false, reason: result.error.message }
+        return { configured: true, online: false, reason: result.error.message, latencyMs, lastPingAt }
       }
-      return { configured: true, online: true, count: result.count || 0 }
+      return {
+        configured: true,
+        online: true,
+        count: result.count || 0,
+        latencyMs,
+        lastPingAt,
+      }
     } catch (err) {
-      return { configured: true, online: false, reason: err.message }
+      return {
+        configured: true,
+        online: false,
+        reason: err.message,
+        latencyMs: Date.now() - startedAt,
+        lastPingAt,
+      }
     }
   },
 

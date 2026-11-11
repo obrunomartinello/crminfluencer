@@ -8,6 +8,8 @@ const {
   checkActorRun,
   extractCreatorsFromSearchItems,
   runMiningActor,
+  getQuotaStatus,
+  clearQuotaCache,
 } = require('../services/apify')
 const { fastInspectBio } = require('../services/linktree')
 const { calculateScore } = require('../services/scoring')
@@ -322,6 +324,7 @@ router.get('/status/:jobId', async (req, res) => {
     // Concluído! Ingerir no banco/store e devolver os criadores prontos para o frontend
     console.log(`[mine/status] Fase 2 concluída para "${query}". Ingerindo ${check2.items.length} perfis completos...`)
     const { imported, newCount, updatedCount, records } = await processAndIngestProfiles(check2.items, { query })
+    clearQuotaCache()
 
     const completedPayload = {
       id: jobId,
@@ -341,6 +344,19 @@ router.get('/status/:jobId', async (req, res) => {
     return res.json(completedPayload)
   } catch (err) {
     console.error(`❌ [mine/status] Erro ao checar status do Job:`, err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/mine/quota — Termômetro de créditos gratuitos restantes na Apify
+router.get('/quota', async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true'
+    const quota = await getQuotaStatus({ forceRefresh })
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    res.json(quota)
+  } catch (err) {
+    console.error('❌ [mine/quota] Erro ao consultar cota Apify:', err.message)
     res.status(500).json({ error: err.message })
   }
 })

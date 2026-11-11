@@ -492,6 +492,97 @@ async function runMiningActor(query, count = 25) {
   }
 }
 
+const QUOTA_CACHE_TTL_MS = 30 * 1000
+const AVG_COST_PER_SEARCH_USD = 0.06
+let quotaCache = null
+
+function clearQuotaCache() {
+  quotaCache = null
+}
+
+function resolveQuotaLevel(percentRemaining, remainingUsd) {
+  if (percentRemaining <= 15 || remainingUsd <= 0.5) return 'critical'
+  if (percentRemaining <= 40 || remainingUsd <= 1.5) return 'warning'
+  return 'healthy'
+}
+
+/**
+ * Consulta o saldo e consumo mensal atual na conta Apify (Plano Free = $5.00/mês)
+ * @param {{ client?: any, token?: string, forceRefresh?: boolean }} options
+ */
+async function getQuotaStatus(options = {}) {
+  const token = options.token !== undefined ? options.token : process.env.APIFY_TOKEN
+  const hasToken = Boolean(token && !String(token).includes('xxxx'))
+
+  if (!options.client && !hasToken) {
+    return {
+      configured: false,
+      plan: 'MOCK',
+      username: null,
+      limitUsd: 0,
+      usedUsd: 0,
+      remainingUsd: 0,
+      percentUsed: 0,
+      percentRemaining: 0,
+      estimatedSearchesLeft: 0,
+      avgCostPerSearchUsd: AVG_COST_PER_SEARCH_USD,
+      cycleStartAt: null,
+      cycleEndAt: null,
+      level: 'warning',
+      fetchedAt: new Date().toISOString(),
+    }
+  }
+
+  if (!options.forceRefresh && quotaCache && Date.now() - quotaCache.ts < QUOTA_CACHE_TTL_MS) {
+    return quotaCache.data
+  }
+
+  let client = options.client
+  if (!client) {
+    const { ApifyClient } = require('apify-client')
+    client = new ApifyClient({ token })
+  }
+
+  const userRef = client.user('me')
+  const [limitsRes, userRes] = await Promise.all([
+    userRef.limits(),
+    typeof userRef.get === 'function' ? userRef.get().catch(() => null) : Promise.resolve(null),
+  ])
+
+  const limitUsd = Number(
+    limitsRes?.limits?.maxMonthlyUsageUsd
+    ?? userRes?.plan?.maxMonthlyUsageUsd
+    ?? userRes?.plan?.monthlyUsageCreditsUsd
+    ?? 5
+  )
+  const usedUsdRaw = Number(limitsRes?.current?.monthlyUsageUsd ?? 0)
+  const usedUsd = Number(usedUsdRaw.toFixed(4))
+  const remainingUsd = Math.max(0, Number((limitUsd - usedUsdRaw).toFixed(4)))
+  const percentUsed = limitUsd > 0 ? Math.min(100, Number(((usedUsdRaw / limitUsd) * 100).toFixed(1))) : 0
+  const percentRemaining = Number((100 - percentUsed).toFixed(1))
+  const estimatedSearchesLeft = Math.max(0, Math.floor(remainingUsd / AVG_COST_PER_SEARCH_USD))
+
+  const payload = {
+    configured: true,
+    plan: userRes?.plan?.id || 'FREE',
+    username: userRes?.username || null,
+    limitUsd,
+    usedUsd,
+    remainingUsd,
+    percentUsed,
+    percentRemaining,
+    estimatedSearchesLeft,
+    avgCostPerSearchUsd: AVG_COST_PER_SEARCH_USD,
+    cycleStartAt: limitsRes?.monthlyUsageCycle?.startAt || null,
+    cycleEndAt: limitsRes?.monthlyUsageCycle?.endAt || null,
+    level: resolveQuotaLevel(percentRemaining, remainingUsd),
+    fetchedAt: new Date().toISOString(),
+  }
+
+  quotaCache = { ts: Date.now(), data: payload }
+  return payload
+}
+
 module.exports = {
   buildSearchInput,
   extractCreatorsFromSearchItems,
@@ -501,5 +592,7 @@ module.exports = {
   checkActorRun,
   mapProfileResult,
   runMiningActor,
+  getQuotaStatus,
+  clearQuotaCache,
   MOCK_INFLUENCERS,
 }

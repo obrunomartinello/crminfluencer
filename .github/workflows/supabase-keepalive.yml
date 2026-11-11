@@ -1,0 +1,39 @@
+name: Supabase Keepalive (Anti-Sleep)
+
+on:
+  schedule:
+    # Roda a cada 2 dias às 12:00 UTC (impede hibernação automática de 7 dias do Supabase Free)
+    - cron: '0 12 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping App Health Endpoint (if APP_HEALTH_URL configured)
+        env:
+          APP_HEALTH_URL: ${{ vars.APP_HEALTH_URL }}
+        run: |
+          if [ -n "$APP_HEALTH_URL" ]; then
+            echo "Pinging $APP_HEALTH_URL..."
+            curl --fail --silent --show-error "$APP_HEALTH_URL"
+            echo ""
+          else
+            echo "APP_HEALTH_URL var not set (Vercel built-in cron handles /api/health if deployed on Vercel)."
+          fi
+
+      - name: Direct Supabase REST Keepalive Ping (if secrets configured)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_KEY" ]; then
+            echo "Pinging Supabase REST API..."
+            curl --fail --silent --show-error \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              "$SUPABASE_URL/rest/v1/influencers?select=id&limit=1" > /dev/null
+            echo "Supabase keepalive ping succeeded!"
+          else
+            echo "SUPABASE_URL / key secrets not configured in GitHub Actions."
+          fi

@@ -10,6 +10,7 @@ import CreatePublicidadeModal from './components/CreatePublicidadeModal'
 import PublicidadesView from './components/PublicidadesView'
 import MetasView from './components/MetasView'
 import ImportView from './components/ImportView'
+import ApifyThermometer from './components/ApifyThermometer'
 import {
   Sparkles,
   Sun,
@@ -53,6 +54,8 @@ export default function App() {
     sortBy: 'recent',
   })
   const [dbStatus, setDbStatus] = useState(null)
+  const [apifyQuota, setApifyQuota] = useState(null)
+  const [quotaLoading, setQuotaLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -87,6 +90,19 @@ export default function App() {
       if (data) setStats(data)
     } catch (err) {
       console.warn('Erro ao carregar stats:', err.message)
+    }
+  }, [])
+
+  // Carregar status dos créditos gratuitos da Apify (Termômetro)
+  const fetchApifyQuota = useCallback(async (forceRefresh = false) => {
+    setQuotaLoading(true)
+    try {
+      const q = await api.getMineQuota(forceRefresh)
+      if (q) setApifyQuota(q)
+    } catch (err) {
+      console.warn('Erro ao consultar cota Apify:', err.message)
+    } finally {
+      setQuotaLoading(false)
     }
   }, [])
 
@@ -130,6 +146,7 @@ export default function App() {
         .then((h) => setDbStatus(h?.supabase || null))
         .catch(() => {})
 
+      fetchApifyQuota(false)
       fetchStats()
       fetchInfluencers(1, filters)
     }
@@ -337,11 +354,21 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <ApifyThermometer
+            quota={apifyQuota}
+            loading={quotaLoading}
+            onClick={() => {
+              fetchApifyQuota(true)
+              setMineModalOpen(true)
+            }}
+            variant="compact"
+          />
+
           {dbStatus && (
             <span
               title={
                 dbStatus.online
-                  ? 'Supabase conectado e ativo'
+                  ? `Supabase conectado e ativo (${dbStatus.count ?? 0} registros${dbStatus.latencyMs ? ` • ${dbStatus.latencyMs}ms` : ''})`
                   : 'Supabase em pausa/offline — leads minerados protegidos no cache local e memória'
               }
               className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border ${
@@ -535,6 +562,9 @@ export default function App() {
       <MineModal
         open={mineModalOpen}
         onClose={() => setMineModalOpen(false)}
+        quota={apifyQuota}
+        quotaLoading={quotaLoading}
+        onRefreshQuota={fetchApifyQuota}
         onComplete={async (newItems = []) => {
           if (Array.isArray(newItems) && newItems.length > 0) {
             try {
@@ -563,6 +593,7 @@ export default function App() {
           setPage(1)
           fetchStats()
           fetchInfluencers(1, updatedFilters)
+          fetchApifyQuota(true)
         }}
       />
 

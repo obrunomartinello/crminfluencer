@@ -10,6 +10,12 @@
       "framework": "express"
     }
   },
+  "crons": [
+    {
+      "path": "/api/health",
+      "schedule": "0 12 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
